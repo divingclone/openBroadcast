@@ -1,0 +1,7 @@
+numpy>=1.24
+onnxruntime-directml==1.24.4; sys_platform == "win32"
+onnxruntime>=1.16; sys_platform != "win32"
+soundfile>=0.12
+sounddevice>=0.4
+pystray==0.19.5; sys_platform == "win32"
+Pillow>=10,<13; sys_platform == "win32"

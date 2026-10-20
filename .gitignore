@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.py[cod]
+.analysis/
+*.tmp
+build/
+dist/
+*.spec
+!OpenBroadcast.spec
