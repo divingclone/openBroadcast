@@ -74,23 +74,6 @@ You need two independent virtual cables, such as the separately available VB-CAB
 The base VB-CABLE package provides only one cable and cannot serve both directions at the same time.
 On Linux, you can use PipeWire virtual devices; on macOS, you can use BlackHole.
 
-## Previewing and processing files
-
-- **Recording test (录音测试)**: Enable the corresponding route, then record up to 20 seconds to compare the input and output. A WAV file is written only when you click Save.
-- **Preview (试听)**: Select your headphones under Preview device (试听设备). Import 48 kHz audio to preview up to 30 seconds; convert other sample rates in the Files (文件) tab first.
-- **File processing**: Adjust microphone effects and their strengths on the audio page, then select the input and output in the Files tab and click Start processing (开始处理).
-  Supported inputs are WAV, FLAC, and OGG; supported outputs are WAV and FLAC. Output is 48 kHz, 16-bit, with the original channel count. The input file cannot be overwritten.
-- Changing effects or inference settings during processing automatically restarts processing. Cancellation or failure preserves any existing output file.
-  If resampling quality is critical, convert to 48 kHz with a dedicated audio tool first.
-
-## Running in the background
-
-- On Windows, clicking the window's **×** hides it to the system tray while audio processing continues. Click the tray icon or launch the app again to restore the window.
-- To exit completely, use the tray icon's right-click menu or select Exit OpenBroadcast (退出 OpenBroadcast) in Settings.
-- The app restores previously enabled audio routes. Click Stop (停止) on a route before exiting if you do not want it restored next time.
-- Enable Launch at startup (开机自启) under Settings → Background operation (设置 → 后台运行). After moving the application folder, turn this option off and on again. Disable it before deleting the app.
-- On systems other than Windows, closing the window exits the app.
-
 ## Troubleshooting
 
 - **Device not found**: Check that it is connected and enabled in your system, then click Refresh devices. Restart your computer after installing VB-CABLE.
