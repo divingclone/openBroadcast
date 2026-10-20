@@ -134,6 +134,10 @@ class Denoiser:
             opts["device_id"] = int(device_id)
         if name == "CUDAExecutionProvider":
             opts["cudnn_conv_algo_search"] = "HEURISTIC"
+        if name == "CoreMLExecutionProvider":
+            if device_id != 0:
+                raise ValueError("CoreML uses system-managed GPU selection; --device-id must be 0")
+            opts["MLComputeUnits"] = "CPUAndGPU"
         return name, opts
 
     def _create_session(

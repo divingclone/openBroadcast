@@ -53,6 +53,15 @@ def readme_filename() -> str:
 
 # Chinese source messages remain stable keys; formatted data is never a lookup key.
 ENGLISH = {
+    "macOS GPU（系统调度）": "macOS GPU (system managed)",
+    "CoreML 允许使用 CPU 和 GPU，由 macOS 调度；不支持指定某一块显卡，也不保证所有运算都在 GPU 上执行。": "CoreML allows CPU and GPU processing, scheduled by macOS. Individual GPUs cannot be selected, and some operations may run on CPU.",
+    "桌面托盘不可用。请启用 StatusNotifier / AppIndicator 或 XEmbed 托盘；GNOME 可能需要托盘扩展。": "Desktop tray unavailable. Enable a StatusNotifier/AppIndicator or XEmbed tray; GNOME may require a tray extension.",
+    "登录后进入托盘，并恢复上次启用的音频路由。\n移动程序目录或 Python 环境后，请关闭再开启此选项以更新路径。": "Start in the tray after sign-in and restore previously enabled audio routes.\nAfter moving the application or Python environment, turn this option off and on to update the path.",
+    "开机自启（登录桌面后）": "Launch at startup (after desktop sign-in)",
+    "关闭主窗口会隐藏到系统托盘，音频处理继续运行。\n通过托盘菜单打开窗口或退出程序；再次启动也会唤醒已有窗口。\n托盘不可用时保留窗口，可最小化以继续处理音频。": "Closing the window hides it to the system tray while audio processing continues.\nUse the tray menu to open or exit; launching again also restores the existing window.\nIf the tray is unavailable, the window stays open. Minimize it to continue processing.",
+    "托盘启动超时，请检查桌面托盘支持和系统库。": "Tray startup timed out. Check desktop tray support and system libraries.",
+    "托盘进程已退出，请检查桌面托盘支持和系统库。": "The tray process exited. Check desktop tray support and system libraries.",
+    "macOS / Linux：关闭窗口会退出程序并停止音频。需要继续处理时请最小化窗口。托盘、开机自启和单实例唤醒目前仅支持 Windows。": "macOS / Linux: closing the window exits the app and stops audio. Minimize the window to keep processing. Tray, launch at startup and single-instance activation currently require Windows.",
     "选择音频文件，应用麦克风效果设置。": "Choose an audio file to apply the microphone effects.",
     "就绪 · 仅音频": "Ready · Audio only",
     "音频": "Audio",
@@ -198,7 +207,7 @@ ENGLISH = {
     "找不到 pythonw.exe，请使用 Windows Python 或便携版。": "pythonw.exe was not found. Use Windows Python or the portable build.",
     "程序路径过长，无法注册开机自启；请移到更短的目录。": "The application path is too long for startup registration. Move it to a shorter path.",
     "开机自启目前仅支持 Windows。": "Launch at startup is currently supported only on Windows.",
-    "启动失败：{exc}\n\n请使用安装了 requirements.txt 的 Python。\n推荐：.venv\\Scripts\\pythonw.exe run_gui.pyw": "Startup failed: {exc}\n\nUse a Python environment with requirements.txt installed.\nRecommended: .venv\\Scripts\\pythonw.exe run_gui.pyw",
+    "启动失败：{exc}\n\n请在已安装 OpenBroadcast 的 Python 环境中运行：\npython -m openbroadcast": "Startup failed: {exc}\n\nRun this in the Python environment where OpenBroadcast is installed:\npython -m openbroadcast",
     "Windows 音频线程初始化失败 (COM 0x{result:08X})": "Windows audio thread initialization failed (COM 0x{result:08X})",
     "所选推理后端初始化失败，请检查 GPU 运行库及驱动，或在设置中切换到 CPU。": "The selected processing backend failed to initialize. Check the GPU runtime and drivers, or switch to CPU in Settings.",
     "（未安装支持）": " (support not installed)",

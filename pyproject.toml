@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openbroadcast"
+dynamic = ["version", "dependencies"]
+description = "Real-time microphone and speaker noise reduction and room echo removal"
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Topic :: Multimedia :: Sound/Audio",
+]
+
+[project.urls]
+Repository = "https://github.com/divingclone/openBroadcast"
+
+[project.scripts]
+openbroadcast = "openbroadcast.cli:main"
+
+[project.gui-scripts]
+openbroadcast-gui = "openbroadcast.launcher:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["openbroadcast*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+openbroadcast = ["run_gui.pyw"]
+"openbroadcast.audio" = ["models/*.onnx", "data/*.npz"]
+
+[tool.setuptools.dynamic]
+version = {attr = "openbroadcast.__version__"}
+dependencies = {file = ["requirements.txt"]}

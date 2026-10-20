@@ -1,4 +1,4 @@
-"""One GUI per Windows user/session, with activation of a hidden first window."""
+"""One GUI per user/session, with activation of a hidden first window."""
 from __future__ import annotations
 
 import hashlib
@@ -13,6 +13,7 @@ class SingleInstance:
         self.name = name or rf"Local\OpenBroadcast.{identity}"
         self._mutex = self._event = self._mapping = None
         self._owned = False
+        self._posix = None
 
     def __enter__(self):
         return self
@@ -22,7 +23,10 @@ class SingleInstance:
 
     def acquire(self):
         if sys.platform != "win32":
-            return True
+            from .posix_instance import PosixInstance
+            if self._posix is None:
+                self._posix = PosixInstance(self.name)
+            return self._posix.acquire()
         if self._mutex is not None:
             raise RuntimeError("SingleInstance.acquire() must only be called once")
         import ctypes as c
@@ -71,6 +75,8 @@ class SingleInstance:
         return False
 
     def activation_requested(self):
+        if self._posix is not None:
+            return self._posix.activation_requested()
         if not self._owned:
             return False
         state = self._api.WaitForSingleObject(self._event, 0)
@@ -82,6 +88,8 @@ class SingleInstance:
         return False
 
     def close(self):
+        if self._posix is not None:
+            self._posix.close()
         if self._mapping is not None:
             self._mapping.close()
             self._mapping = None

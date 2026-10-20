@@ -1,7 +1,8 @@
-"""Opt-in portable-package check; uses temporary settings and no audio streams."""
+"""Opt-in installed/portable-package check; temporary settings, no audio streams."""
 from pathlib import Path
 import hashlib
 import json
+import sys
 import tempfile
 import time
 import traceback
@@ -20,10 +21,11 @@ def run(report_path):
         from .gui import App
         from .settings import SettingsStore
         from .i18n import get_language, tr
+        from .resources import documentation_path
 
         report["language"] = get_language()
         for guide in ("README.md", "README.zh-CN.md"):
-            assert Path(__file__).with_name(guide).is_file(), f"Missing user guide: {guide}"
+            assert documentation_path(guide).is_file(), f"Missing user guide: {guide}"
 
         report["devices"] = len(list_devices())
         # Fixed nonzero signal exercises FFT, model state and audio serialization.
@@ -50,7 +52,7 @@ def run(report_path):
             root.withdraw()
             app = App(root, SettingsStore(folder / "settings.json"))
             assert app.heading.cget("text") == tr("音频"), "UI language was not applied"
-            deadline = time.monotonic() + 10
+            deadline = time.monotonic() + 20
             while not app.tray_ready and time.monotonic() < deadline:
                 root.update()
                 if app.tray is None:
@@ -61,7 +63,8 @@ def run(report_path):
             app.toggle_layout()
             assert app.store.load()["expanded"], "Layout preference was not saved"
             app.toggle_layout()
-            report["gui"] = "Tk layout, saved preferences and native tray initialized"
+            report["gui"] = "Tk layout and saved preferences initialized"
+            report["tray"] = "initialized"
             app.request_exit()
             deadline = time.monotonic() + 5
             while not app.closed and time.monotonic() < deadline:

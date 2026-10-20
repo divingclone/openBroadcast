@@ -19,7 +19,10 @@ from .audio.denoiser import RATE, HOP, Denoiser
 from .audio.runtime import AudioRoute, EffectSettings, list_devices, device_matches
 from .audio.player import PreviewPlayer
 from .audio.samples import installed_samples, read_sample
-from .audio.inference import discover_gpus, selected_gpu, inference_options
+from .resources import documentation_path
+from .audio.inference import (
+    COREML, discover_gpus, selected_gpu, inference_options, preferred_gpu, apply_inference_default,
+)
 from .settings import SettingsStore
 from .ui_widgets import IconButton, NavButton, ThinSlider, draw_icon
 from .tray import TrayIcon
@@ -128,6 +131,7 @@ class App:
         self.store = store or SettingsStore()
         self.config = self.store.load()
         self.gpus = discover_gpus()
+        apply_inference_default(self.config, self.gpus)
         legacy_gpu = selected_gpu(self.config, self.gpus)
         if legacy_gpu and not self.config["gpu"] and self.config["inference_mode"] == "gpu":
             self.config["gpu"] = legacy_gpu.key
@@ -190,8 +194,14 @@ class App:
             self._icon.put(GREEN, to=(x, 16-height//2, x+3, 16+height//2))
         root.iconphoto(True, self._icon)
         root.protocol("WM_DELETE_WINDOW", self.on_close)
+        if root.tk.call("tk", "windowingsystem") == "aqua":
+            root.createcommand("::tk::mac::ReopenApplication", self.restore_window)
+            root.createcommand("::tk::mac::Quit", self.request_exit)
         # Bind only our main window; ttk popdowns have their own toplevel.
         root.bind("<MouseWheel>", self._wheel, add="+")
+        if root.tk.call("tk", "windowingsystem") == "x11":
+            root.bind("<Button-4>", self._wheel, add="+")
+            root.bind("<Button-5>", self._wheel, add="+")
         root.bind("<Control-1>", lambda _: self.show_page("audio"))
         root.bind("<Control-2>", lambda _: self.show_page("files"))
         root.bind("<Control-3>", lambda _: self.show_page("settings"))
@@ -425,7 +435,14 @@ class App:
             canvas = widget.canvas
             bounds = canvas.bbox("all")
             if bounds and bounds[3] > canvas.winfo_height():
-                canvas.yview_scroll(-int(event.delta/120), "units")
+                button = getattr(event, "num", None)
+                if button in (4, 5):
+                    units = -1 if button == 4 else 1
+                elif sys.platform == "darwin":
+                    units = -int(event.delta)
+                else:
+                    units = -int(event.delta / 120)
+                canvas.yview_scroll(units, "units")
                 return "break"
 
     def build_audio(self, parent):
@@ -1064,27 +1081,27 @@ class App:
         self.label(box, tr('后台运行'), font=(FONT, -16, "bold")).pack(anchor="w")
         row = self.frame(box)
         row.pack(fill="x", pady=12)
-        self.label(row, tr('开机自启（登录 Windows 后）')).pack(side="left")
+        self.label(row, tr('开机自启（登录桌面后）')).pack(side="left")
         try:
             enabled = startup.is_enabled()
         except OSError:
             enabled = False
         self.startup_enabled = tk.BooleanVar(value=enabled)
-        self.startup_switch = Switch(row, self, self.startup_enabled, self.change_startup,
-                                     disabled=sys.platform != "win32")
+        self.startup_switch = Switch(row, self, self.startup_enabled, self.change_startup)
         self.startup_switch.pack(side="left", padx=18)
-        self.label(box, tr('登录后进入托盘，并恢复上次启用的音频路由。\n移动便携目录后，请关闭再开启此选项以更新路径。'),
+        self.label(box, tr('登录后进入托盘，并恢复上次启用的音频路由。\n移动程序目录或 Python 环境后，请关闭再开启此选项以更新路径。'),
                    muted=True, wraplength=750, justify="left").pack(anchor="w")
-        self.label(box, tr('Windows：关闭主窗口会隐藏到右下角系统托盘，音频处理继续运行。\n点击托盘图标可恢复窗口；右键选择“退出 OpenBroadcast”可完全退出。\n标题栏的最小化按钮仍最小化到任务栏。'),
+        self.label(box, tr('关闭主窗口会隐藏到系统托盘，音频处理继续运行。\n通过托盘菜单打开窗口或退出程序；再次启动也会唤醒已有窗口。\n托盘不可用时保留窗口，可最小化以继续处理音频。'),
                    muted=True, wraplength=750, justify="left").pack(anchor="w", pady=14)
         self.button(box, tr('退出 OpenBroadcast'), self.request_exit).pack(anchor="w", pady=8)
 
     def change_inference_mode(self):
         self.config["inference_mode"] = self.inference_mode.get()
-        if self.inference_mode.get() == "gpu" and not self.config["gpu"] and self.gpus:
-            index = next((i for i, d in enumerate(self.gpus) if d.available), 0)
-            self.gpu_combo.current(index)
-            self.change_gpu()
+        if self.inference_mode.get() == "gpu" and not self.config["gpu"]:
+            device = preferred_gpu(self.gpus)
+            if device:
+                self.gpu_combo.current(self.gpus.index(device))
+                self.config.update(gpu=device.key, provider=device.provider, device_id=device.device_id)
         self.update_inference_controls()
         self.schedule_save()
         self.inference_changed()
@@ -1109,7 +1126,9 @@ class App:
             hint = tr('使用 CPU 处理音频，已选显卡不会参与推理。')
         else:
             device = selected_gpu(self.config, self.gpus)
-            if device and device.available:
+            if device and device.available and device.provider == COREML:
+                hint = tr('CoreML 允许使用 CPU 和 GPU，由 macOS 调度；不支持指定某一块显卡，也不保证所有运算都在 GPU 上执行。')
+            elif device and device.available:
                 hint = tr('使用所选显卡处理音频；切换后自动重新载入模型，无需重启程序。')
             elif device:
                 hint = tr('已检测到显卡，但当前运行库不支持该 GPU 后端。\n请按使用说明安装 GPU 运行库并重启，或切换到 CPU。')
@@ -1147,7 +1166,7 @@ class App:
         scroll.pack(side="right", fill="y")
         text.configure(yscrollcommand=scroll.set)
         text.pack(fill="both", expand=True)
-        text.insert("1.0", Path(__file__).with_name(readme_filename()).read_text(encoding="utf-8"))
+        text.insert("1.0", documentation_path(readme_filename()).read_text(encoding="utf-8"))
         text.configure(state="disabled")
 
     def tick(self):
@@ -1289,9 +1308,6 @@ class App:
     def on_close(self):
         if self.closing:
             return
-        if sys.platform != "win32":
-            self.request_exit()
-            return
         self.save_config()
         if self.tray_ready:
             self.root.withdraw()
@@ -1303,7 +1319,7 @@ class App:
 
     def ensure_tray(self):
         """Keep one icon for the whole session, including while the GUI is visible."""
-        if sys.platform != "win32" or self.closing or self.tray is not None:
+        if self.closing or self.tray is not None:
             return
         try:
             self.tray = TrayIcon(self.events)
@@ -1339,16 +1355,14 @@ class App:
             route.stop()
 
 
-def main():
+def main(background=False):
     with SingleInstance() as instance:
         if not instance.acquire():
             return 0
         root = tk.Tk()
-        if "--background" in sys.argv:
-            root.withdraw()
         app = App(root)
         app.instance = instance
-        if "--background" in sys.argv:
+        if background:
             root.after_idle(app.on_close)
         root.mainloop()
     return 0

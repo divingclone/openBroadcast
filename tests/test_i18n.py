@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 
 from openbroadcast import i18n
 from openbroadcast.tray import TrayIcon
+from openbroadcast.resources import documentation_path
 
 
 class LanguageTests(unittest.TestCase):
@@ -104,4 +105,4 @@ class LanguageTests(unittest.TestCase):
                 tray._show()
                 events.put.assert_called_with(("tray_show", None))
                 self.assertEqual(i18n.readme_filename(), guide)
-                self.assertTrue((root / guide).is_file())
+                self.assertTrue(documentation_path(guide).is_file())

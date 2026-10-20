@@ -1,4 +1,4 @@
-"""Actual cross-process Windows mutex/event tests, isolated from the app."""
+"""Actual cross-process ownership and activation tests, isolated from the app."""
 from pathlib import Path
 import subprocess
 import sys
@@ -8,7 +8,6 @@ import uuid
 from openbroadcast.single_instance import SingleInstance
 
 
-@unittest.skipUnless(sys.platform == "win32", "Windows single-instance implementation")
 class SingleInstanceTests(unittest.TestCase):
     def setUp(self):
         self.name = "Local\\OpenBroadcast-test-" + uuid.uuid4().hex
@@ -16,12 +15,12 @@ class SingleInstanceTests(unittest.TestCase):
 
     def secondary(self):
         return subprocess.run(
-            [sys.executable, "-c",
+            [sys.executable, "-I", "-c",
              "import sys; from openbroadcast.single_instance import SingleInstance\n"
              "with SingleInstance(sys.argv[1]) as instance:\n"
              " print(instance.acquire(), flush=True)\n", self.name],
             cwd=self.cwd, capture_output=True, text=True, timeout=15,
-            creationflags=subprocess.CREATE_NO_WINDOW,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
         )
 
     def test_duplicate_exits_and_queues_activation_before_gui_exists(self):
@@ -39,13 +38,14 @@ class SingleInstanceTests(unittest.TestCase):
 
     def test_abandoned_mutex_can_be_acquired_after_process_crash(self):
         child = subprocess.Popen(
-            [sys.executable, "-c",
+            [sys.executable, "-I", "-c",
              "import sys; from openbroadcast.single_instance import SingleInstance\n"
              "with SingleInstance(sys.argv[1]) as instance:\n"
              " print(instance.acquire(), flush=True)\n"
              " sys.stdin.read()\n", self.name],
             cwd=self.cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, text=True, creationflags=subprocess.CREATE_NO_WINDOW,
+            stderr=subprocess.PIPE, text=True,
+            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
         )
         try:
             self.assertEqual(child.stdout.readline().strip(), "True")

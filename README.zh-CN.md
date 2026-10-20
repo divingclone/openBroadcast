@@ -1,75 +1,65 @@
 # OpenBroadcast Audio
 
-[English](README.md) | 简体中文
+[English](https://github.com/divingclone/openBroadcast/blob/main/README.md) | 简体中文
 
-用于麦克风和扬声器的实时降噪、房间回声消除，也可处理音频文件。
-本项目不是 NVIDIA 官方客户端；目前不支持视频、音棚音效或自带虚拟音频设备。
+面向 Windows、macOS 和 Linux 的 NVIDIA Broadcast 独立移植项目，提供麦克风与扬声器降噪、房间回声消除及音频文件处理。
+不包含视频、音棚音效或虚拟声卡驱动。macOS 和 Linux 的真实音频硬件验证仍在进行中。
 
-## 启动
+## 安装
 
-**Windows 便携版**：解压后运行 `OpenBroadcast.exe`，保留整个程序目录。
-无需安装 Python、NVIDIA Broadcast 或 CUDA。
+**Windows 便携版**：[下载 ZIP](https://github.com/divingclone/openBroadcast/releases/latest/download/OpenBroadcast-windows-x64.zip)，解压后运行 `OpenBroadcast.exe`，保留整个目录。无需安装 Python、NVIDIA Broadcast 或 CUDA。
 
-**源码运行**：需要 Python 3.10+（含 Tkinter），在项目目录执行：
+**Python 安装包（三系统通用）**：[下载 wheel](https://github.com/divingclone/openBroadcast/releases/download/v0.2.3/openbroadcast-0.2.3-py3-none-any.whl)。需要 64 位 Python 3.11+（含 Tkinter），推荐 Python 3.12。
+创建并激活虚拟环境：
 
-```powershell
+```sh
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\pythonw.exe run_gui.pyw
 ```
 
-Linux 还需安装 Tk 和 PortAudio（如 `sudo apt install python3-tk libportaudio2`）；
-macOS 需使用带 Tk 的 Python。安装依赖后运行 `python run_gui.pyw`。
-项目主要在 Windows 上验证。
+- Windows PowerShell：`.venv\Scripts\Activate.ps1`
+- macOS / Linux：`source .venv/bin/activate`（上一步按需使用 `python3`）
 
-Windows GPU 处理需要兼容 DirectX 12 的 NVIDIA、AMD 或 Intel 显卡，并安装正常工作的驱动。
+在下载文件所在目录安装并启动：
 
-## 将处理后的声音用于通话
+```sh
+python -m pip install --upgrade ./openbroadcast-0.2.3-py3-none-any.whl
+openbroadcast-gui
+```
 
-Windows 需以管理员身份安装 [VB-CABLE 虚拟音频线](https://vb-audio.com/Cable/)，重启电脑后点击“刷新设备”。
-程序不附带此驱动。Linux 可使用 PipeWire 虚拟设备，macOS 可使用 BlackHole。
+以后激活同一环境，在任意目录运行 `openbroadcast-gui` 即可。安装包已包含音频模型。
+也可安装 Git 后执行 `python -m pip install "git+https://github.com/divingclone/openBroadcast.git"`，直接从源码安装。
 
-`CABLE Input` 是播放端，`CABLE Output` 是录音端，两者属于同一条音频线。
+- **Windows**：标准 Python 安装程序包含 Tk；GPU 处理使用 DirectML，需要兼容 DirectX 12 的显卡。
+- **macOS**：使用带 Tk 的 Python，并为启动程序的应用授予麦克风权限。pip 不会生成 `.app` 或启动台入口，使用上述命令启动。
+- **Linux**：需安装 Tk、PortAudio 及[安装说明](https://github.com/divingclone/openBroadcast/blob/main/docs/compatibility.md#安装与构建)中的桌面依赖。GUI 需要图形桌面。
 
-### 处理麦克风
+## 通话接线
 
-在 OpenBroadcast 中选择真实麦克风，将“音频路由 → 发送到”设为 **CABLE Input**，启用麦克风路由。
-在通话软件中，将麦克风设为 **CABLE Output**，扬声器设为真实耳机。
+Windows / macOS 需另行安装 [VB-CABLE](https://vb-audio.com/Cable/)，完成后刷新设备。Linux 使用 PipeWire 或 PulseAudio 自行配置虚拟音频路由。
 
-监听麦克风时请使用耳机，避免啸叫。
+| 路由 | OpenBroadcast 输入 | OpenBroadcast 输出 | 通话软件 |
+| --- | --- | --- | --- |
+| 麦克风 | 真实麦克风 | 虚拟线 A 播放端 | 麦克风：虚拟线 A 录音端 |
+| 扬声器 | 虚拟线 B 录音端 | 真实耳机 / 音箱 | 扬声器：虚拟线 B 播放端 |
 
-### 处理扬声器
-
-将通话软件的扬声器设为 **CABLE Input**。在 OpenBroadcast 中，将“音频路由 → 接收来自”设为 **CABLE Output**，
-输出选择真实耳机或音箱，启用扬声器路由。
-
-只有一条虚拟音频线时，先停止麦克风路由，并将通话软件的麦克风改回真实设备。
-
-### 同时处理两路
-
-需要两条独立的虚拟音频线，例如另行获取的 VB-CABLE A+B：
-
-| 设置位置 | 选择设备 |
-| --- | --- |
-| OpenBroadcast 麦克风输入 | 真实麦克风 |
-| OpenBroadcast 麦克风“发送到” | CABLE-A Input |
-| 通话软件的麦克风 | CABLE-A Output |
-| 通话软件的扬声器 | CABLE-B Input |
-| OpenBroadcast 扬声器“接收来自” | CABLE-B Output |
-| OpenBroadcast 扬声器输出 | 真实耳机或音箱 |
+在 OpenBroadcast 中启用对应路由。单独处理一路只需一条虚拟线；**同时处理两路必须使用两条独立虚拟线**。
+Windows 的播放端名为 `CABLE Input`，录音端名为 `CABLE Output`。macOS 两个方向可能同名，请按用途选择。
+监听麦克风时使用耳机，避免啸叫。
 
 ## 常见问题
 
-- **找不到设备或没有声音**：检查设备连接、系统麦克风权限及上述接线。刷新设备并重新选择断开的设备；程序不会自动改用其他设备。
-- **采样率报错**：实时处理要求 48 kHz，在 Windows 声音控制面板的设备“属性 → 高级”中选择 48000 Hz。
-- **GPU 启动失败或音频卡顿**：尝试在“设置”中改用 CPU，或减少同时启用的效果和路由。
+- **没有声音**：检查麦克风权限及上述接线；刷新设备并重新选择断开的设备。
+- **采样率报错**：实时设备需使用 **48 kHz**，在 Windows 声音设置、macOS“音频 MIDI 设置”或 Linux 音频配置中调整。
+- **GPU 报错或卡顿**：在设置中改用 CPU，或减少同时启用的效果和路由。
 
-## 命令行（源码版）
+## 命令行
 
-在包含 `openbroadcast` 文件夹的父目录执行：
+安装后执行：
 
-```powershell
-openbroadcast\.venv\Scripts\python.exe -m openbroadcast devices
-openbroadcast\.venv\Scripts\python.exe -m openbroadcast process input.flac output.wav --dereverb
-openbroadcast\.venv\Scripts\python.exe -m openbroadcast --help
+```sh
+openbroadcast devices
+openbroadcast process input.flac output.wav --dereverb
+openbroadcast --help
 ```
+
+平台依赖、GPU 支持、开发构建及验证情况见[兼容性与构建说明](https://github.com/divingclone/openBroadcast/blob/main/docs/compatibility.md)。

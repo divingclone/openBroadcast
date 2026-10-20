@@ -5,9 +5,7 @@ import argparse
 import hashlib
 import json
 import math
-import queue
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -15,6 +13,7 @@ import numpy as np
 
 from . import __version__
 from .audio.denoiser import HOP, LATENCY, RATE, Denoiser, DenoiserChain, read_wav, write_wav
+from .audio.inference import inference_options
 
 ROOT = Path(__file__).resolve().parent
 
@@ -27,24 +26,29 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def _inference_options(args: argparse.Namespace):
+    if args.provider == "auto":
+        if args.device_id is not None:
+            raise ValueError("--device-id requires an explicit --provider (for example cuda or dml)")
+        return inference_options(dict(inference_mode="auto", threads=args.threads))
+    return dict(provider=args.provider, device_id=args.device_id or 0, threads=args.threads)
+
+
 def _make_engine(args: argparse.Namespace, dereverb: bool = False):
+    options = _inference_options(args)
     stages = []
     if dereverb:
         stages.append(
             Denoiser(
                 model_file="dereverb_48k.onnx",
-                provider=args.provider,
-                device_id=args.device_id,
                 intensity=args.intensity,
-                threads=args.threads,
+                **options,
             )
         )
     stages.append(
         Denoiser(
-            provider=args.provider,
-            device_id=args.device_id,
             intensity=args.intensity,
-            threads=args.threads,
+            **options,
         )
     )
     return stages[0] if len(stages) == 1 else DenoiserChain(stages)
@@ -123,73 +127,38 @@ def cmd_mic(args: argparse.Namespace) -> int:
     if args.input_device is None or args.output_device is None:
         raise SystemExit("Choose --input-device and --output-device (see `devices`).")
 
-    engine = _make_engine(args, dereverb=args.dereverb)
-    incoming: queue.Queue = queue.Queue(maxsize=16)
-    outgoing: queue.Queue = queue.Queue(maxsize=16)
-    stop = threading.Event()
-    counters = {"input_drop": 0, "output_underrun": 0, "device_status": 0}
-    failures: list[BaseException] = []
+    from .audio.runtime import AudioRoute, EffectSettings
 
-    def worker() -> None:
-        try:
-            while not stop.is_set():
-                try:
-                    block = incoming.get(timeout=0.1)
-                except queue.Empty:
-                    continue
-                clean = engine.process(block)
-                while not stop.is_set():
-                    try:
-                        outgoing.put(clean, timeout=0.1)
-                        break
-                    except queue.Full:
-                        pass
-        except BaseException as exc:
-            failures.append(exc)
-            stop.set()
-
-    def callback(indata, outdata, frames, _time, status) -> None:
-        if status:
-            counters["device_status"] += 1
-        if frames != HOP:
-            outdata.fill(0)
-            raise sd.CallbackAbort
-        try:
-            incoming.put_nowait(indata[:, 0].copy())
-        except queue.Full:
-            counters["input_drop"] += 1
-        try:
-            outdata[:, 0] = outgoing.get_nowait()
-        except queue.Empty:
-            outdata.fill(0)
-            counters["output_underrun"] += 1
-
-    thread = threading.Thread(target=worker, daemon=True)
-    thread.start()
+    # Separate input/output streams support independent physical/virtual devices,
+    # including CoreAudio. Reuse the GUI's worker and Windows COM lifecycle.
+    route = AudioRoute("microphone", sd_module=sd)
+    route.start(
+        args.input_device, args.output_device, channels=1,
+        effects=EffectSettings(noise=True, dereverb=args.dereverb,
+                               noise_strength=args.intensity, dereverb_strength=args.intensity),
+        **_inference_options(args),
+    )
+    announced = False
     try:
-        with sd.Stream(
-            samplerate=RATE,
-            blocksize=HOP,
-            dtype="float32",
-            channels=1,
-            device=(args.input_device, args.output_device),
-            callback=callback,
-        ) as stream:
-            print(
-                f"Noise removal running. Model delay {engine.latency / RATE * 1000:.0f} ms "
-                f"+ device buffers. Ctrl+C to stop."
-            )
-            while not stop.wait(0.2):
-                if not stream.active:
-                    raise RuntimeError("Audio stream stopped unexpectedly")
+        while True:
+            state = route.snapshot()
+            if state["state"] == "error":
+                raise RuntimeError(state["error"])
+            if state["state"] == "running" and not announced:
+                print(f"Noise removal running. Model delay {state['latency_ms']:.0f} ms "
+                      "+ device buffers. Ctrl+C to stop.")
+                announced = True
+            if not route.busy:
+                raise RuntimeError("Audio stream stopped unexpectedly")
+            time.sleep(0.2)
     except KeyboardInterrupt:
         pass
     finally:
-        stop.set()
-        thread.join(timeout=2)
-    print(json.dumps(counters), file=sys.stderr)
-    if failures:
-        raise RuntimeError("Audio worker failed") from failures[0]
+        route.stop(wait=True)
+        state = route.snapshot()
+        counters = {key: state[key] for key in (
+            "input_drop", "output_drop", "output_underrun", "device_status")}
+        print(json.dumps(counters), file=sys.stderr)
     return 0
 
 
@@ -199,7 +168,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
         raise SystemExit("--seconds must be a finite positive number")
     rng = np.random.default_rng(0)
     audio = rng.normal(0, 0.03, int(RATE * seconds)).astype(np.float32)
-    engine = Denoiser(provider=args.provider, device_id=args.device_id, threads=args.threads)
+    engine = Denoiser(**_inference_options(args))
     t0 = time.perf_counter()
     engine.process_audio(audio)
     elapsed = time.perf_counter() - t0
@@ -228,7 +197,7 @@ def cmd_process(args: argparse.Namespace) -> int:
     result = process_file(
         args.input, args.output, noise=not args.no_noise, dereverb=args.dereverb,
         noise_strength=args.noise_strength, dereverb_strength=args.dereverb_strength,
-        provider=args.provider, threads=args.threads, device_id=args.device_id,
+        **_inference_options(args),
     )
     print(json.dumps(result, indent=2))
     return 0
@@ -246,10 +215,11 @@ def build_parser() -> argparse.ArgumentParser:
     def common(sp):
         sp.add_argument(
             "--provider",
-            default="cpu",
-            help="onnxruntime provider alias: cpu, cuda, dml, coreml, rocm, migraphx, openvino",
+            default="auto",
+            help="default: auto (prefer a high-performance GPU, otherwise CPU); "
+                 "aliases: cpu, cuda, dml, coreml, rocm, migraphx, openvino",
         )
-        sp.add_argument("--device-id", type=int, default=0)
+        sp.add_argument("--device-id", type=int, help="native device index; requires an explicit --provider")
         sp.add_argument("--threads", type=int, default=2)
 
     info = sub.add_parser("info", help="show model hashes and available providers")
@@ -296,7 +266,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if getattr(args, "provider", None) == "auto" and args.device_id is not None:
+        parser.error("--device-id requires an explicit --provider (for example cuda or dml)")
     return args.func(args)
 
 

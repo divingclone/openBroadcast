@@ -1,10 +1,10 @@
 # -*- mode: python ; coding: utf-8 -*-
 from pathlib import Path
 
-root = Path(SPECPATH)
+root = Path(SPECPATH).parent.parent
 datas = [(str(root / src), dst) for src, dst in [
-    ('audio/models', 'openbroadcast/audio/models'),
-    ('audio/data', 'openbroadcast/audio/data'),
+    ('src/openbroadcast/audio/models', 'openbroadcast/audio/models'),
+    ('src/openbroadcast/audio/data', 'openbroadcast/audio/data'),
     ('README.md', 'openbroadcast'),
     ('README.zh-CN.md', 'openbroadcast'),
 ]]
@@ -13,8 +13,8 @@ hiddenimports = ['pystray._win32']
 
 
 a = Analysis(
-    [str(root / 'run_gui.pyw')],
-    pathex=[str(root.parent)],
+    [str(root / 'src' / 'openbroadcast' / 'run_gui.pyw')],
+    pathex=[str(root / 'src')],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,

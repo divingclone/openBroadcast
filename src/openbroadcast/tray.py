@@ -1,12 +1,20 @@
-"""Windows notification-area icon; all GUI actions travel through a queue."""
+"""Platform tray adapters; all GUI actions travel through a queue."""
 from __future__ import annotations
 
 from .i18n import tr
 
 import threading
+import sys
 
 
-class TrayIcon:
+def TrayIcon(events):
+    if sys.platform == "win32":
+        return WindowsTrayIcon(events)
+    from .tray_process import ProcessTray
+    return ProcessTray(events)
+
+
+class WindowsTrayIcon:
     def __init__(self, events):
         # Keep non-Windows startup and source installs without tray dependencies usable.
         import pystray

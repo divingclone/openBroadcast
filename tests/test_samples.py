@@ -3,7 +3,6 @@ import json
 import os
 from pathlib import Path
 import struct
-import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -11,7 +10,6 @@ from unittest.mock import patch
 import numpy as np
 import soundfile as sf
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from openbroadcast.audio.samples import installed_samples, read_sample, MAX_SAMPLE_BYTES
 
 

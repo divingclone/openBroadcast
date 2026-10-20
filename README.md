@@ -1,75 +1,66 @@
 # OpenBroadcast Audio
 
-English | [简体中文](README.zh-CN.md)
+English | [简体中文](https://github.com/divingclone/openBroadcast/blob/main/README.zh-CN.md)
 
-Real-time noise reduction and room echo removal for microphones and speakers, with audio file processing.
-This project is not an official NVIDIA client. Video features, Studio Voice, and a bundled virtual audio device are not currently supported.
+An independent port of NVIDIA Broadcast for Windows, macOS and Linux, providing microphone and speaker noise reduction, room echo removal, and audio file processing.
+Video, Studio Voice and virtual audio drivers are not included. macOS and Linux audio hardware validation is still in progress.
 
-## Getting started
+## Installation
 
-**Windows portable build**: Extract the archive and run `OpenBroadcast.exe`. Keep the entire application folder together.
-You do not need to install Python, NVIDIA Broadcast, or CUDA.
+**Windows portable build**: [Download the ZIP](https://github.com/divingclone/openBroadcast/releases/latest/download/OpenBroadcast-windows-x64.zip), extract it and run `OpenBroadcast.exe`. Keep the entire folder together. Python, NVIDIA Broadcast and CUDA are not required.
 
-**Run from source**: Python 3.10+ with Tkinter is required. Run these commands from the project directory:
+**Python package (all platforms)**: [Download the wheel](https://github.com/divingclone/openBroadcast/releases/download/v0.2.3/openbroadcast-0.2.3-py3-none-any.whl). Use 64-bit Python 3.11+ with Tkinter; Python 3.12 is recommended.
+Create and activate a virtual environment:
 
-```powershell
+```sh
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\pythonw.exe run_gui.pyw
 ```
 
-On Linux, also install Tk and PortAudio (for example, `sudo apt install python3-tk libportaudio2`).
-On macOS, use a Python installation with Tk support. After installing the dependencies, run `python run_gui.pyw`.
-The project is primarily tested on Windows.
+- Windows PowerShell: `.venv\Scripts\Activate.ps1`
+- macOS / Linux: `source .venv/bin/activate` (use `python3` above if needed)
 
-GPU processing on Windows requires a DirectX 12-compatible NVIDIA, AMD, or Intel GPU with working drivers.
+From the folder containing the downloaded wheel, install and launch:
 
-## Using processed audio in calls
+```sh
+python -m pip install --upgrade ./openbroadcast-0.2.3-py3-none-any.whl
+openbroadcast-gui
+```
 
-On Windows, install [VB-CABLE Virtual Audio Cable](https://vb-audio.com/Cable/) as administrator, restart your computer, then click Refresh devices.
-The driver is not bundled. On Linux, use PipeWire virtual devices; on macOS, use BlackHole.
+For later launches, activate the same environment and run `openbroadcast-gui` from any directory.
+The package includes the audio models.
+Alternatively, with Git installed, use `python -m pip install "git+https://github.com/divingclone/openBroadcast.git"`.
 
-`CABLE Input` is the playback endpoint, and `CABLE Output` is the recording endpoint of the same virtual cable.
+- **Windows**: The standard Python installer includes Tk. GPU processing uses DirectML and requires a DirectX 12-compatible GPU.
+- **macOS**: Use a Python installation with Tk, and grant microphone permission to the launching app. pip does not create a `.app` or Launchpad entry; use the command above.
+- **Linux**: Install Tk, PortAudio and the desktop libraries listed in the [installation notes](https://github.com/divingclone/openBroadcast/blob/main/docs/compatibility.md#安装与构建). The GUI requires a graphical desktop.
 
-### Processing your microphone
+## Audio routing for calls
 
-Set OpenBroadcast's microphone input to your physical microphone and **Audio routing → Send to** to **CABLE Input**.
-Enable the microphone route. In your calling app, select **CABLE Output** as the microphone and your physical headphones as the speakers.
+Install [VB-CABLE](https://vb-audio.com/Cable/) separately on Windows or macOS, then refresh devices. On Linux, configure virtual routing with PipeWire or PulseAudio.
 
+| Route | OpenBroadcast input | OpenBroadcast output | Calling app |
+| --- | --- | --- | --- |
+| Microphone | Physical microphone | Virtual cable A playback endpoint | Microphone: cable A recording endpoint |
+| Speakers | Virtual cable B recording endpoint | Physical headphones / speakers | Speakers: cable B playback endpoint |
+
+Enable the corresponding route in OpenBroadcast. One virtual cable is enough for either route; **two independent cables are required to use both at once**.
+Windows names the playback endpoint `CABLE Input` and the recording endpoint `CABLE Output`. macOS may use the same name for both directions; select by role.
 Use headphones when monitoring your microphone to avoid feedback.
-
-### Processing speaker audio
-
-Set your calling app's speakers to **CABLE Input**. In OpenBroadcast, set **Audio routing → Receive from** to **CABLE Output**,
-select your physical headphones or speakers as the output, and enable the speaker route.
-
-With only one virtual cable, stop the microphone route first and switch your calling app's microphone back to the physical device.
-
-### Processing both routes at once
-
-You need two independent virtual cables, such as the separately available VB-CABLE A+B:
-
-| Setting | Device |
-| --- | --- |
-| OpenBroadcast microphone input | Physical microphone |
-| OpenBroadcast microphone Send to | CABLE-A Input |
-| Calling app microphone | CABLE-A Output |
-| Calling app speakers | CABLE-B Input |
-| OpenBroadcast speaker Receive from | CABLE-B Output |
-| OpenBroadcast speaker output | Physical headphones or speakers |
 
 ## Troubleshooting
 
-- **Missing device or no audio**: Check device connections, system microphone permissions, and the routing above. Refresh devices and reselect any disconnected device; the app does not automatically switch to another one.
-- **Sample rate error**: Real-time processing requires 48 kHz. In the Windows Sound control panel, select 48000 Hz under the device's Properties → Advanced.
-- **GPU initialization fails or audio stutters**: Try switching to CPU processing in Settings, or reduce the number of active effects and routes.
+- **No audio**: Check microphone permissions and the routing above. Refresh devices and reselect any disconnected device.
+- **Sample rate error**: Real-time devices must use **48 kHz**. Set this in Windows Sound settings, macOS Audio MIDI Setup, or your Linux audio configuration.
+- **GPU error or stuttering**: Select CPU in Settings, or reduce the number of active effects and routes.
 
-## Command line (source version)
+## Command line
 
-Run these commands from the parent directory containing the `openbroadcast` folder:
+After installation:
 
-```powershell
-openbroadcast\.venv\Scripts\python.exe -m openbroadcast devices
-openbroadcast\.venv\Scripts\python.exe -m openbroadcast process input.flac output.wav --dereverb
-openbroadcast\.venv\Scripts\python.exe -m openbroadcast --help
+```sh
+openbroadcast devices
+openbroadcast process input.flac output.wav --dereverb
+openbroadcast --help
 ```
+
+See the [compatibility and build notes](https://github.com/divingclone/openBroadcast/blob/main/docs/compatibility.md) for platform dependencies, GPU support, development and validation details.

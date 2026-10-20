@@ -1,6 +1,7 @@
 """Real Tk widgets, isolated settings, mocked devices and asynchronous services."""
 from pathlib import Path
 import gc
+import os
 import tempfile
 import threading
 import tkinter as tk
@@ -13,7 +14,7 @@ from openbroadcast import gui
 from openbroadcast.i18n import tr
 from openbroadcast.audio.runtime import AudioRoute, DeviceInfo
 from openbroadcast.settings import SettingsStore
-from openbroadcast.audio.inference import GpuDevice, DML, CPU
+from openbroadcast.audio.inference import GpuDevice, DML, CPU, COREML
 
 
 DEVICES = [
@@ -79,7 +80,10 @@ class GuiTests(unittest.TestCase):
             patch.object(gui, "list_devices", return_value=DEVICES),
             patch.object(gui, "installed_samples", return_value={}),
             patch.object(gui, "discover_gpus", return_value=[
-                GpuDevice("NVIDIA GeForce RTX 5090", DML, 2, "dxgi:test")]),
+                GpuDevice("Integrated GPU", DML, 0, "dxgi:integrated", performance_rank=1),
+                GpuDevice("NVIDIA GeForce RTX 5090", DML, 2, "dxgi:test", performance_rank=0)]),
+            patch("openbroadcast.audio.inference.discover_gpus",
+                  side_effect=lambda: gui.discover_gpus()),
             patch.object(gui, "PreviewPlayer"),
             patch.object(gui, "TrayIcon"),
             patch.object(gui.startup, "is_enabled", return_value=False),
@@ -98,6 +102,8 @@ class GuiTests(unittest.TestCase):
             self.root = tk.Tk()
         except tk.TclError as exc:
             self.temp.cleanup()
+            if os.environ.get("OPENBROADCAST_REQUIRE_DISPLAY"):
+                raise
             self.skipTest(f"Tk display unavailable: {exc}")
         self.root.withdraw()
         self.app = gui.App(self.root, self.store)
@@ -122,10 +128,7 @@ class GuiTests(unittest.TestCase):
         self.app.device_changed(key, role)
 
     def test_inference_controls_are_exclusive_and_preserve_selected_gpu(self):
-        self.assertEqual(self.app.cpu_settings.winfo_manager(), "pack")
-        self.assertEqual(self.app.gpu_settings.winfo_manager(), "")
-        self.app.inference_mode.set("gpu")
-        self.app.change_inference_mode()
+        self.assertEqual(self.app.config["inference_mode"], "gpu")
         self.assertEqual(self.app.cpu_settings.winfo_manager(), "")
         self.assertEqual(self.app.gpu_settings.winfo_manager(), "pack")
         self.assertIn("RTX 5090", self.app.gpu_combo.get())
@@ -138,6 +141,23 @@ class GuiTests(unittest.TestCase):
         self.choose("mic", "output", 8)
         self.app.toggle_route("mic")
         self.assertEqual(self.app.routes["mic"].started[-1][1]["provider"], CPU)
+
+    def test_switching_to_gpu_without_previous_choice_prefers_discrete(self):
+        self.app.config.update(inference_mode="cpu", gpu=None, provider=CPU, device_id=0)
+        self.app.inference_mode.set("gpu")
+        self.app.change_inference_mode()
+        self.assertEqual(self.app.config["gpu"]["identity"], "dxgi:test")
+        self.assertEqual(self.app.config["device_id"], 2)
+        self.app.save_config()
+        self.assertEqual(self.store.load()["gpu"]["identity"], "dxgi:test")
+
+    def test_coreml_control_explains_system_managed_gpu(self):
+        device = GpuDevice(tr("macOS GPU（系统调度）"), COREML, 0, "coreml:system")
+        self.app.gpus = [device]
+        self.app.config.update(inference_mode="gpu", gpu=device.key, provider=COREML, device_id=0)
+        self.app.update_inference_controls()
+        self.assertIn("CoreML", self.app.inference_hint.cget("text"))
+        self.assertIn("macOS", self.app.inference_hint.cget("text"))
 
     def test_live_device_change_coalesces_and_only_restarts_affected_route(self):
         self.choose("mic", "output", 8)
@@ -153,6 +173,8 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(len(self.app.routes["speaker"].started), 1)
 
     def test_cpu_threads_and_gpu_selection_apply_to_running_routes(self):
+        self.app.inference_mode.set("cpu")
+        self.app.change_inference_mode()
         self.choose("mic", "output", 8)
         self.app.toggle_route("mic")
         self.app.setting("threads", 7)
@@ -167,6 +189,8 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(self.app.routes["mic"].started[-1][1]["provider"], DML)
 
     def test_manual_stop_cancels_pending_reconfiguration_and_persists(self):
+        self.app.inference_mode.set("cpu")
+        self.app.change_inference_mode()
         self.choose("mic", "output", 8)
         self.app.toggle_route("mic")
         self.app.setting("threads", 3)
@@ -228,6 +252,8 @@ class GuiTests(unittest.TestCase):
         self.player.play.assert_not_called()
 
     def test_file_setting_change_restarts_original_job_and_cancel_wins(self):
+        self.app.inference_mode.set("cpu")
+        self.app.change_inference_mode()
         self.app.file_thread = Mock()
         self.app.file_thread.is_alive.return_value = True
         self.app.file_request = ("source.wav", "destination.wav")
@@ -258,6 +284,8 @@ class GuiTests(unittest.TestCase):
         gui.messagebox.showerror.assert_called_once()
 
     def test_native_combobox_popdown_focus_does_not_break_tick(self):
+        if self.root.tk.call("tk", "windowingsystem") == "aqua":
+            self.skipTest("Aqua uses a native menu instead of a Tcl popdown listbox")
         # ttk creates this Tcl window without registering a Python widget.
         self.root.deiconify()
         self.app.show_page("settings")
@@ -294,6 +322,8 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(selections, [])
 
     def test_dropdown_wheel_scrolls_list_without_moving_background(self):
+        if self.root.tk.call("tk", "windowingsystem") == "aqua":
+            self.skipTest("Aqua uses a native menu instead of a Tcl popdown listbox")
         self.root.deiconify()
         combo = self.app.ui["mic"]["input"]
         combo.configure(values=[f"Microphone {i}" for i in range(40)], height=5)
@@ -318,6 +348,8 @@ class GuiTests(unittest.TestCase):
         self.root.tk.call("ttk::combobox::Unpost", str(combo))
 
     def test_click_in_dropdown_still_selects_device(self):
+        if self.root.tk.call("tk", "windowingsystem") == "aqua":
+            self.skipTest("Aqua uses a native menu instead of a Tcl popdown listbox")
         self.root.deiconify()
         combo = self.app.ui["mic"]["input"]
         combo.current(0)
@@ -334,6 +366,8 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(self.app.config["mic"]["input"], DEVICES[1].key)
 
     def test_page_wheel_still_scrolls_after_dropdown_closes(self):
+        if self.root.tk.call("tk", "windowingsystem") == "aqua":
+            self.skipTest("Aqua uses a native menu instead of a Tcl popdown listbox")
         self.root.deiconify()
         combo = self.app.ui["mic"]["input"]
         scroller = combo.master
@@ -377,6 +411,9 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(self.app.root.cget("bg"), gui.PALETTES["dark"]["bg"])
 
     def test_compact_default_and_layout_restored_after_restart(self):
+        # X11 does not assign a withdrawn window's geometry until it is mapped.
+        self.root.deiconify()
+        self.root.update()
         self.assertFalse(self.app.expanded)
         self.assertEqual(self.root.geometry().split("x")[0], "560")
         for expected in (True, False):
@@ -389,11 +426,11 @@ class GuiTests(unittest.TestCase):
             self.root = tk.Tk()
             self.root.withdraw()
             self.app = gui.App(self.root, self.store)
-            self.root.update_idletasks()
+            self.root.deiconify()
+            self.root.update()
             self.assertEqual(self.app.expanded, expected)
             self.assertEqual(self.root.geometry().split("x")[0], "1120" if expected else "560")
 
-    @unittest.skipUnless(gui.sys.platform == "win32", "Windows tray")
     def test_tray_starts_with_visible_window_and_survives_restore(self):
         gui.TrayIcon.assert_called_once_with(self.app.events)
         gui.TrayIcon.return_value.start.assert_called_once()
@@ -633,6 +670,44 @@ class GuiTests(unittest.TestCase):
             gate.return_value.__enter__.return_value.acquire.return_value = False
             self.assertEqual(gui.main(), 0)
             root.assert_not_called()
+
+    def test_unix_close_preserves_audio_and_waits_for_tray(self):
+        for platform in ("darwin", "linux"):
+            with self.subTest(platform=platform), patch.object(gui.sys, "platform", platform), \
+                 patch.object(self.app, "request_exit") as exit_app:
+                self.app.tray_ready = False
+                self.app.tray_hide_pending = False
+                self.app.on_close()
+                exit_app.assert_not_called()
+                self.assertTrue(self.app.tray_hide_pending)
+                self.assertFalse(self.app.closing)
+                self.app.events.put(("tray_ready", None))
+                self.app.tick()
+                self.assertEqual(self.root.state(), "withdrawn")
+                self.app.restore_window()
+                self.assertEqual(self.root.state(), "normal")
+
+    def test_background_launch_never_withdraws_before_tray_is_ready(self):
+        with patch.object(gui, "SingleInstance") as gate, patch.object(gui.tk, "Tk") as root, \
+             patch.object(gui, "App") as app:
+            gate.return_value.__enter__.return_value.acquire.return_value = True
+            gui.main(background=True)
+            root.return_value.withdraw.assert_not_called()
+            root.return_value.after_idle.assert_called_once_with(app.return_value.on_close)
+
+    def test_mac_and_x11_wheel_deltas_scroll_the_page(self):
+        self.root.deiconify()
+        self.root.update()
+        scroller = self.app.ui["mic"]["input"].master
+        while not isinstance(scroller, gui.Scroller):
+            scroller = scroller.master
+        for platform, delta, button in (("darwin", -1, None), ("linux", 0, 5)):
+            scroller.canvas.yview_moveto(0)
+            self.root.update()
+            before = scroller.canvas.yview()
+            with patch.object(gui.sys, "platform", platform):
+                self.app._wheel(Mock(widget=scroller.body, delta=delta, num=button))
+            self.assertGreater(scroller.canvas.yview()[0], before[0])
 
     def test_tray_failure_keeps_window_accessible_and_audio_running(self):
         self.app.routes["mic"].snap["state"] = "running"

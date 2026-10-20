@@ -1,6 +1,5 @@
 from concurrent.futures import CancelledError
 from pathlib import Path
-import sys
 import tempfile
 from threading import Event
 import unittest
@@ -9,7 +8,6 @@ from unittest.mock import patch
 import numpy as np
 import soundfile as sf
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from openbroadcast.audio import files
 
 

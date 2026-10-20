@@ -5,6 +5,7 @@ import copy
 import json
 import math
 import os
+import sys
 from pathlib import Path
 import tempfile
 from .i18n import tr
@@ -26,7 +27,7 @@ DEFAULT_SETTINGS = {
     "provider": "cpu",
     "threads": 2,
     "device_id": 0,
-    "inference_mode": "cpu",
+    "inference_mode": "auto",
     "gpu": None,
     "theme": "dark",
     "expanded": False,
@@ -66,11 +67,16 @@ def validate_settings(values: object) -> dict:
     provider = values.get("provider")
     if isinstance(provider, str) and provider.strip() and len(provider) <= 128:
         result["provider"] = provider.strip()
-    if values.get("inference_mode") in ("cpu", "gpu"):
+    if values.get("inference_mode") in ("auto", "cpu", "gpu"):
         result["inference_mode"] = values["inference_mode"]
     elif result["provider"].lower() in (
-            "cuda", "dml", "directml", "cudaexecutionprovider", "dmlexecutionprovider"):
+            "cuda", "dml", "directml", "coreml",
+            "cudaexecutionprovider", "dmlexecutionprovider", "coremlexecutionprovider"):
         result["inference_mode"] = "gpu"
+    elif isinstance(provider, str) and provider.strip() and len(provider) <= 128:
+        # Older settings had only a provider. Preserve their explicit CPU (or
+        # unsupported provider) choice instead of treating them as a fresh install.
+        result["inference_mode"] = "cpu"
     gpu = values.get("gpu")
     if isinstance(gpu, dict) and all(isinstance(gpu.get(k), str) and 0 < len(gpu[k]) <= 256
                                      for k in ("name", "provider", "identity")):
@@ -91,6 +97,8 @@ def default_settings_path() -> Path:
     if os.name == "nt":
         base = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
         return base / "OpenBroadcast" / "settings.json"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "OpenBroadcast" / "settings.json"
     base = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
     return base / "OpenBroadcast" / "settings.json"
 
