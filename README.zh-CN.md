@@ -9,29 +9,22 @@
 
 **Windows 便携版**：[下载 ZIP](https://github.com/divingclone/openBroadcast/releases/latest/download/OpenBroadcast-windows-x64.zip)，解压后运行 `OpenBroadcast.exe`，保留整个目录。无需安装 Python、NVIDIA Broadcast 或 CUDA。
 
-**Python 安装包（三系统通用）**：[下载 wheel](https://github.com/divingclone/openBroadcast/releases/download/v0.2.3/openbroadcast-0.2.3-py3-none-any.whl)。需要 64 位 Python 3.11+（含 Tkinter），推荐 Python 3.12。
-创建并激活虚拟环境：
+**uv（三系统通用）**：安装 [uv](https://docs.astral.sh/uv/getting-started/installation/)，然后安装并启动：
 
 ```sh
-python -m venv .venv
-```
-
-- Windows PowerShell：`.venv\Scripts\Activate.ps1`
-- macOS / Linux：`source .venv/bin/activate`（上一步按需使用 `python3`）
-
-在下载文件所在目录安装并启动：
-
-```sh
-python -m pip install --upgrade ./openbroadcast-0.2.3-py3-none-any.whl
+uv tool install --python 3.12 "https://github.com/divingclone/openBroadcast/releases/download/v0.2.3/openbroadcast-0.2.3-py3-none-any.whl"
 openbroadcast-gui
 ```
 
-以后激活同一环境，在任意目录运行 `openbroadcast-gui` 即可。安装包已包含音频模型。
-也可安装 Git 后执行 `python -m pip install "git+https://github.com/divingclone/openBroadcast.git"`，直接从源码安装。
+uv 自动管理 Python 和运行环境。以后直接运行 `openbroadcast-gui`；若提示找不到命令，执行 `uv tool update-shell` 后重新打开终端。
 
-- **Windows**：标准 Python 安装程序包含 Tk；GPU 处理使用 DirectML，需要兼容 DirectX 12 的显卡。
-- **macOS**：使用带 Tk 的 Python，并为启动程序的应用授予麦克风权限。pip 不会生成 `.app` 或启动台入口，使用上述命令启动。
-- **Linux**：需安装 Tk、PortAudio 及[安装说明](https://github.com/divingclone/openBroadcast/blob/main/docs/compatibility.md#安装与构建)中的桌面依赖。GUI 需要图形桌面。
+也可使用普通 pip 安装，需要 64 位 Python 3.11+（含 Tkinter，推荐 3.12）：
+
+```sh
+python -m pip install "https://github.com/divingclone/openBroadcast/releases/download/v0.2.3/openbroadcast-0.2.3-py3-none-any.whl"
+```
+
+安装包已包含音频模型。macOS 需为启动程序的应用授予麦克风权限；Linux 需要图形桌面及[系统依赖](https://github.com/divingclone/openBroadcast/blob/main/docs/compatibility.md#安装与构建)。
 
 ## 通话接线
 

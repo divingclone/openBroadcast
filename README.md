@@ -9,30 +9,22 @@ Video, Studio Voice and virtual audio drivers are not included. macOS and Linux 
 
 **Windows portable build**: [Download the ZIP](https://github.com/divingclone/openBroadcast/releases/latest/download/OpenBroadcast-windows-x64.zip), extract it and run `OpenBroadcast.exe`. Keep the entire folder together. Python, NVIDIA Broadcast and CUDA are not required.
 
-**Python package (all platforms)**: [Download the wheel](https://github.com/divingclone/openBroadcast/releases/download/v0.2.3/openbroadcast-0.2.3-py3-none-any.whl). Use 64-bit Python 3.11+ with Tkinter; Python 3.12 is recommended.
-Create and activate a virtual environment:
+**uv (all platforms)**: Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then install and launch:
 
 ```sh
-python -m venv .venv
-```
-
-- Windows PowerShell: `.venv\Scripts\Activate.ps1`
-- macOS / Linux: `source .venv/bin/activate` (use `python3` above if needed)
-
-From the folder containing the downloaded wheel, install and launch:
-
-```sh
-python -m pip install --upgrade ./openbroadcast-0.2.3-py3-none-any.whl
+uv tool install --python 3.12 "https://github.com/divingclone/openBroadcast/releases/download/v0.2.3/openbroadcast-0.2.3-py3-none-any.whl"
 openbroadcast-gui
 ```
 
-For later launches, activate the same environment and run `openbroadcast-gui` from any directory.
-The package includes the audio models.
-Alternatively, with Git installed, use `python -m pip install "git+https://github.com/divingclone/openBroadcast.git"`.
+uv manages Python and the environment automatically. For later launches, run `openbroadcast-gui`. If the command is not found, run `uv tool update-shell` and reopen your terminal.
 
-- **Windows**: The standard Python installer includes Tk. GPU processing uses DirectML and requires a DirectX 12-compatible GPU.
-- **macOS**: Use a Python installation with Tk, and grant microphone permission to the launching app. pip does not create a `.app` or Launchpad entry; use the command above.
-- **Linux**: Install Tk, PortAudio and the desktop libraries listed in the [installation notes](https://github.com/divingclone/openBroadcast/blob/main/docs/compatibility.md#安装与构建). The GUI requires a graphical desktop.
+You can also use regular pip with 64-bit Python 3.11+ and Tkinter (3.12 recommended):
+
+```sh
+python -m pip install "https://github.com/divingclone/openBroadcast/releases/download/v0.2.3/openbroadcast-0.2.3-py3-none-any.whl"
+```
+
+Audio models are included. On macOS, grant microphone permission to the launching app. On Linux, a graphical desktop and [system dependencies](https://github.com/divingclone/openBroadcast/blob/main/docs/compatibility.md#安装与构建) are required.
 
 ## Audio routing for calls
 
