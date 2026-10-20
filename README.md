@@ -1,14 +1,16 @@
 # OpenBroadcast Audio
 
-用于麦克风和扬声器的实时降噪、房间回声消除，也可处理音频文件。
-本项目不是 NVIDIA 官方客户端；目前不支持视频、音棚音效或自带虚拟音频设备。
+English | [简体中文](README.zh-CN.md)
 
-## 启动
+Real-time noise reduction and room echo removal for microphones and speakers, with audio file processing.
+This project is not an official NVIDIA client. Video features, Studio Voice, and a bundled virtual audio device are not currently supported.
 
-**Windows 便携版**：解压后运行 `OpenBroadcast.exe`，保留整个程序目录。
-无需安装 Python、NVIDIA Broadcast 或 CUDA。
+## Getting started
 
-**源码运行**：需要 Python 3.10+（含 Tkinter），在项目目录执行：
+**Windows portable build**: Extract the archive and run `OpenBroadcast.exe`. Keep the entire application folder together.
+You do not need to install Python, NVIDIA Broadcast, or CUDA.
+
+**Run from source**: Python 3.10+ with Tkinter is required. Run these commands from the project directory:
 
 ```powershell
 python -m venv .venv
@@ -16,89 +18,89 @@ python -m venv .venv
 .\.venv\Scripts\pythonw.exe run_gui.pyw
 ```
 
-Linux 还需安装 Tk 和 PortAudio（如 `sudo apt install python3-tk libportaudio2`）；
-macOS 需使用带 Tk 的 Python。安装依赖后运行 `python run_gui.pyw`。
-项目主要在 Windows 上验证。
+On Linux, also install Tk and PortAudio (for example, `sudo apt install python3-tk libportaudio2`).
+On macOS, use a Python installation with Tk support. After installing the dependencies, run `python run_gui.pyw`.
+The project is primarily tested on Windows.
 
-默认使用 CPU，可在“设置”中切换至 GPU 并选择显卡。
-Windows 版支持兼容 DirectX 12 的 NVIDIA、AMD、Intel 显卡，需安装正常工作的显卡驱动。
+Processing uses the CPU by default. You can switch to GPU processing and select a graphics card in Settings (设置).
+The Windows version supports DirectX 12-compatible NVIDIA, AMD, and Intel GPUs with working graphics drivers.
 
-## 将处理后的声音用于通话
+## Using processed audio in calls
 
-Windows 需另行安装 [VB-CABLE 虚拟音频线](https://vb-audio.com/Cable/)：
-下载并解压，以管理员身份运行适合系统架构的安装程序，按提示安装并重启电脑。
-便携包不包含此驱动。安装后在 OpenBroadcast 中点击“刷新设备”。
+On Windows, install [VB-CABLE Virtual Audio Cable](https://vb-audio.com/Cable/) separately:
+download and extract it, run the installer for your system architecture as administrator, follow the installation prompts, and restart your computer.
+This driver is not included in the portable build. After installation, click Refresh devices (刷新设备) in OpenBroadcast.
 
-`CABLE Input` 是播放端，`CABLE Output` 是录音端，两者属于同一条音频线。
+`CABLE Input` is the playback endpoint, and `CABLE Output` is the recording endpoint of the same virtual cable.
 
-### 处理麦克风
+### Processing your microphone
 
-1. 在 OpenBroadcast 的麦克风区域选择真实麦克风。
-2. 展开“音频路由”，将“发送到”设为 **CABLE Input**。
-3. 开启需要的效果，点击效果名称调整强度，再点击“启用麦克风”。
-4. 在通话或录制软件中，将麦克风设为 **CABLE Output**，扬声器设为真实耳机。
-5. 保持 OpenBroadcast 运行，用通话软件的麦克风测试确认声音正常。
+1. Select your physical microphone in OpenBroadcast's microphone section.
+2. Expand Audio routing (音频路由) and set Send to (发送到) to **CABLE Input**.
+3. Turn on the effects you need, click an effect name to adjust its strength, then click Enable microphone (启用麦克风).
+4. In your calling or recording app, set the microphone to **CABLE Output** and the speakers to your physical headphones.
+5. Keep OpenBroadcast running and use your calling app's microphone test to check the audio.
 
-没有虚拟音频线时，可将“发送到”设为耳机进行本地测试；避免用音箱监听麦克风，以免啸叫。
+Without a virtual cable, you can set Send to to your headphones for a local test. Avoid monitoring your microphone through speakers, as this can cause feedback.
 
-### 处理扬声器
+### Processing speaker audio
 
-只有一条虚拟音频线时，先停止上述麦克风路由，并将通话软件的麦克风改回真实麦克风。
+If you have only one virtual cable, first stop the microphone route described above and switch your calling app's microphone back to your physical microphone.
 
-1. 将通话软件的扬声器设为 **CABLE Input**。
-2. 在 OpenBroadcast 的扬声器区域选择真实耳机或音箱。
-3. 展开“音频路由”，将“接收来自”设为 **CABLE Output**。
-4. 开启需要的效果，点击“启用扬声器”。
+1. Set your calling app's speakers to **CABLE Input**.
+2. Select your physical headphones or speakers in OpenBroadcast's speaker section.
+3. Expand Audio routing (音频路由) and set Receive from (接收来自) to **CABLE Output**.
+4. Turn on the effects you need and click Enable speakers (启用扬声器).
 
-### 同时处理两路
+### Processing both routes at once
 
-需要两条独立的虚拟音频线，例如另行获取的 VB-CABLE A+B：
+You need two independent virtual cables, such as the separately available VB-CABLE A+B:
 
-| 设置位置 | 选择设备 |
+| Setting | Device |
 | --- | --- |
-| OpenBroadcast 麦克风输入 | 真实麦克风 |
-| OpenBroadcast 麦克风“发送到” | CABLE-A Input |
-| 通话软件的麦克风 | CABLE-A Output |
-| 通话软件的扬声器 | CABLE-B Input |
-| OpenBroadcast 扬声器“接收来自” | CABLE-B Output |
-| OpenBroadcast 扬声器输出 | 真实耳机或音箱 |
+| OpenBroadcast microphone input | Physical microphone |
+| OpenBroadcast microphone Send to | CABLE-A Input |
+| Calling app microphone | CABLE-A Output |
+| Calling app speakers | CABLE-B Input |
+| OpenBroadcast speaker Receive from | CABLE-B Output |
+| OpenBroadcast speaker output | Physical headphones or speakers |
 
-基础版 VB-CABLE 只有一条线，不能同时用于两个方向。
-Linux 可使用 PipeWire 虚拟设备，macOS 可使用 BlackHole。
+The base VB-CABLE package provides only one cable and cannot serve both directions at the same time.
+On Linux, you can use PipeWire virtual devices; on macOS, you can use BlackHole.
 
-## 试听与文件处理
+## Previewing and processing files
 
-- **录音测试**：先启用对应路由，再录制最多 20 秒音频，对比输入与输出；点击保存才会写入 WAV。
-- **试听**：在“试听设备”中选择耳机。可导入 48 kHz 音频，最长试听 30 秒；其他采样率可先在“文件”页转换。
-- **文件处理**：先在音频页调整麦克风效果与强度，再进入“文件”页选择输入和输出，点击“开始处理”。
-  支持 WAV / FLAC / OGG 输入、WAV / FLAC 输出；输出为 48 kHz、16-bit，保留声道数，不能覆盖输入文件。
-- 处理过程中修改效果或推理设置会自动重新处理；取消或失败会保留原有输出文件。
-  对重采样质量要求较高时，请先用专用音频工具转换为 48 kHz。
+- **Recording test (录音测试)**: Enable the corresponding route, then record up to 20 seconds to compare the input and output. A WAV file is written only when you click Save.
+- **Preview (试听)**: Select your headphones under Preview device (试听设备). Import 48 kHz audio to preview up to 30 seconds; convert other sample rates in the Files (文件) tab first.
+- **File processing**: Adjust microphone effects and their strengths on the audio page, then select the input and output in the Files tab and click Start processing (开始处理).
+  Supported inputs are WAV, FLAC, and OGG; supported outputs are WAV and FLAC. Output is 48 kHz, 16-bit, with the original channel count. The input file cannot be overwritten.
+- Changing effects or inference settings during processing automatically restarts processing. Cancellation or failure preserves any existing output file.
+  If resampling quality is critical, convert to 48 kHz with a dedicated audio tool first.
 
-## 后台运行
+## Running in the background
 
-- Windows 下点击窗口 **×** 会隐藏到系统托盘，音频继续运行；点击托盘图标或再次启动程序可恢复窗口。
-- 完全退出：右键托盘图标，或在“设置”页选择“退出 OpenBroadcast”。
-- 程序会恢复上次启用的音频路由；不希望下次恢复时，先点击该路的“停止”。
-- 在“设置 → 后台运行”中开启“开机自启”。移动程序目录后需关闭再开启此选项；删除程序前先关闭自启。
-- 非 Windows 系统关闭窗口即退出。
+- On Windows, clicking the window's **×** hides it to the system tray while audio processing continues. Click the tray icon or launch the app again to restore the window.
+- To exit completely, use the tray icon's right-click menu or select Exit OpenBroadcast (退出 OpenBroadcast) in Settings.
+- The app restores previously enabled audio routes. Click Stop (停止) on a route before exiting if you do not want it restored next time.
+- Enable Launch at startup (开机自启) under Settings → Background operation (设置 → 后台运行). After moving the application folder, turn this option off and on again. Disable it before deleting the app.
+- On systems other than Windows, closing the window exits the app.
 
-## 常见问题
+## Troubleshooting
 
-- **找不到设备**：确认设备已连接、在系统中启用，点击“刷新设备”；VB-CABLE 安装后需重启电脑。
-- **通话软件收不到声音**：确认麦克风路由已启用、电平有变化，并按上面的接线选择设备；检查系统麦克风权限及软件静音状态。
-- **扬声器无声**：确认扬声器路由已启用，输出为真实耳机或音箱。
-- **采样率报错**：实时处理要求 48 kHz，在 Windows 声音控制面板的设备“属性 → 高级”中选择 48000 Hz。
-- **GPU 启动失败或音频卡顿**：尝试在“设置”中改用 CPU，或减少同时启用的效果和路由。
-- **设备断开后无法恢复**：重新选择有效设备；程序不会自动改用其他设备。
+- **Device not found**: Check that it is connected and enabled in your system, then click Refresh devices. Restart your computer after installing VB-CABLE.
+- **No audio in your calling app**: Check that the microphone route is enabled and its level meter is moving. Select devices as described above, and check system microphone permissions and the app's mute settings.
+- **No speaker audio**: Check that the speaker route is enabled and its output is set to your physical headphones or speakers.
+- **Sample rate error**: Real-time processing requires 48 kHz. In the Windows Sound control panel, select 48000 Hz under the device's Properties → Advanced.
+- **GPU initialization fails or audio stutters**: Try switching to CPU processing in Settings, or reduce the number of active effects and routes.
+- **Audio does not recover after a device disconnects**: Select a valid device again. The app does not automatically switch to another device.
 
-Windows 设置文件位于 `%APPDATA%\OpenBroadcast\settings.json`。
-卸载便携版前先关闭自启并退出程序，再删除程序目录；VB-CABLE 需通过其官方安装程序单独卸载，
-卸载前将通话软件的输入、输出改回真实设备。
+On Windows, settings are stored in `%APPDATA%\OpenBroadcast\settings.json`.
+To remove the portable app, disable launch at startup, exit the app, and delete its folder.
+Uninstall VB-CABLE separately using its official installer; first switch your calling app's input and output back to physical devices.
 
-## 命令行（源码版）
+## Command line (source version)
 
-在包含 `openbroadcast` 文件夹的父目录执行：
+Run these commands from the parent directory containing the `openbroadcast` folder:
 
 ```powershell
 openbroadcast\.venv\Scripts\python.exe -m openbroadcast devices
@@ -106,4 +108,4 @@ openbroadcast\.venv\Scripts\python.exe -m openbroadcast process input.flac outpu
 openbroadcast\.venv\Scripts\python.exe -m openbroadcast --help
 ```
 
-各子命令可追加 `--help` 查看选项。
+Append `--help` to any subcommand to view its options.

@@ -6,6 +6,7 @@ datas = [(str(root / src), dst) for src, dst in [
     ('audio/models', 'openbroadcast/audio/models'),
     ('audio/data', 'openbroadcast/audio/data'),
     ('README.md', 'openbroadcast'),
+    ('README.zh-CN.md', 'openbroadcast'),
 ]]
 binaries = []
 hiddenimports = ['pystray._win32']

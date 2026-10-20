@@ -16,6 +16,7 @@ try {
     $appDirectory = Join-Path $OutputDirectory 'OpenBroadcast'
     $archivePath = Join-Path $OutputDirectory 'OpenBroadcast-windows-x64.zip'
     Copy-Item -LiteralPath (Join-Path $projectRoot 'README.md') -Destination (Join-Path $appDirectory 'README.md')
+    Copy-Item -LiteralPath (Join-Path $projectRoot 'README.zh-CN.md') -Destination (Join-Path $appDirectory 'README.zh-CN.md')
     Compress-Archive -LiteralPath $appDirectory -DestinationPath $archivePath -Force
     Write-Output "Portable app: $appDirectory\OpenBroadcast.exe (keep the entire folder)."
     Write-Output "Archive: $archivePath"
