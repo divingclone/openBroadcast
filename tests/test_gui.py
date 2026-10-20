@@ -425,11 +425,21 @@ class GuiTests(unittest.TestCase):
             self.root.destroy()
             self.root = tk.Tk()
             self.root.withdraw()
-            self.app = gui.App(self.root, self.store)
+            requested_width = 1120 if expected else 560
+            with patch.object(self.root, "geometry", wraps=self.root.geometry) as geometry:
+                self.app = gui.App(self.root, self.store)
+                geometry.assert_any_call(f"{requested_width}x820")
             self.root.deiconify()
             self.root.update()
             self.assertEqual(self.app.expanded, expected)
-            self.assertEqual(self.root.geometry().split("x")[0], "1120" if expected else "560")
+            # Native window managers clamp large windows on the CI runners'
+            # small desktops. Check the restored request and usable size.
+            width = self.root.winfo_width()
+            self.assertLessEqual(width, requested_width)
+            if expected:
+                self.assertGreater(width, 560)
+            else:
+                self.assertEqual(width, 560)
 
     def test_tray_starts_with_visible_window_and_survives_restore(self):
         gui.TrayIcon.assert_called_once_with(self.app.events)

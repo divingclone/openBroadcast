@@ -83,7 +83,8 @@ class UnixStartupTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 startup._desktop_exec([invalid])
 
-    @unittest.skipUnless(os.name != "nt" and shutil.which("gio"), "Requires GIO desktop launcher")
+    @unittest.skipUnless(startup.sys.platform == "linux" and shutil.which("gio"),
+                         "Requires the Linux GIO desktop launcher")
     def test_exec_escaping_with_real_desktop_launcher(self):
         special = self.folder / 'space $`%\\"字'
         special.mkdir()

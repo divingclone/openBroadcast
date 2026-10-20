@@ -53,6 +53,6 @@ class StartupTests(unittest.TestCase):
             pythonw.touch()
             with patch.object(startup.sys, "executable", str(python)), patch.object(startup.sys, "frozen", False, create=True):
                 command = startup.startup_command()
-            self.assertTrue(command.startswith(f'"{pythonw.resolve()}" '))
+            self.assertTrue(command.startswith(f'"{pythonw.absolute()}" '))
             self.assertIn(str(Path(startup.__file__).resolve().with_name("run_gui.pyw")), command)
             self.assertTrue(command.endswith(" --background"))
