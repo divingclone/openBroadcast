@@ -19,6 +19,11 @@ def run(report_path):
         from .audio.runtime import list_devices
         from .gui import App
         from .settings import SettingsStore
+        from .i18n import get_language, tr
+
+        report["language"] = get_language()
+        for guide in ("README.md", "README.zh-CN.md"):
+            assert Path(__file__).with_name(guide).is_file(), f"Missing user guide: {guide}"
 
         report["devices"] = len(list_devices())
         # Fixed nonzero signal exercises FFT, model state and audio serialization.
@@ -44,6 +49,7 @@ def run(report_path):
             root = tk.Tk()
             root.withdraw()
             app = App(root, SettingsStore(folder / "settings.json"))
+            assert app.heading.cget("text") == tr("音频"), "UI language was not applied"
             deadline = time.monotonic() + 10
             while not app.tray_ready and time.monotonic() < deadline:
                 root.update()

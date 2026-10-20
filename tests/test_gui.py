@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 import numpy as np
 
 from openbroadcast import gui
+from openbroadcast.i18n import tr
 from openbroadcast.audio.runtime import AudioRoute, DeviceInfo
 from openbroadcast.settings import SettingsStore
 from openbroadcast.audio.inference import GpuDevice, DML, CPU
@@ -65,12 +66,15 @@ class FakeRoute:
 
 
 class GuiTests(unittest.TestCase):
+    language = "zh-CN"
+
     def setUp(self):
         # Collect Tk cycles on the GUI thread, after mock cleanup releases callbacks.
         self.addCleanup(gc.collect)
         self.temp = tempfile.TemporaryDirectory()
         self.store = SettingsStore(Path(self.temp.name) / "settings.json")
         self.patches = [
+            patch("openbroadcast.i18n.get_language", return_value=self.language),
             patch.object(gui, "AudioRoute", FakeRoute),
             patch.object(gui, "list_devices", return_value=DEVICES),
             patch.object(gui, "installed_samples", return_value={}),
@@ -192,7 +196,7 @@ class GuiTests(unittest.TestCase):
             self.root.after_cancel(timer)
         self.app = gui.App(self.root, self.store)
         self.assertEqual(self.app.routes["mic"].started, [])
-        self.assertIn("无法恢复", self.app.ui["mic"]["state"].cget("text"))
+        self.assertIn(tr("无法恢复音频："), self.app.ui["mic"]["state"].cget("text"))
         gui.messagebox.showerror.assert_not_called()
         self.choose("mic", "input", 2)
         self.app.pending_routes["mic"] = 0
@@ -488,7 +492,7 @@ class GuiTests(unittest.TestCase):
         self.assertNotIn(2, [d.index for d in self.app.ui["mic"]["input"]._devices])
         with self.assertRaises(ValueError):
             self.app.selected("mic", "input")
-        self.assertIn("不可用", self.app.ui["mic"]["input"].get())
+        self.assertIn(tr("设备不可用："), self.app.ui["mic"]["input"].get())
 
     def test_legacy_selection_migrates_to_named_wasapi_endpoint(self):
         self.app.config["mic"]["input"] = dict(name="Microphone", hostapi="MME")
@@ -505,7 +509,7 @@ class GuiTests(unittest.TestCase):
         self.app.populate_devices()
         with self.assertRaises(ValueError):
             self.app.selected("mic", "input")
-        self.assertIn("同名", self.app.ui["mic"]["input"].get())
+        self.assertIn(tr("存在同名设备，请重新选择"), self.app.ui["mic"]["input"].get())
 
     def test_event_dispatch_updates_file_status_and_sample_preview(self):
         self.app.events.put(("progress", 0.25))
@@ -532,7 +536,7 @@ class GuiTests(unittest.TestCase):
         self.app.events.put(("file_cancelled", None))
         self.app.events.put(("sample_cancelled", None))
         self.app.tick()
-        self.assertIn("已取消", self.app.file_status.get())
+        self.assertIn(tr("已取消，目标文件保持不变。"), self.app.file_status.get())
 
     def test_file_worker_runs_off_tk_thread_and_dispatches_results(self):
         main_thread = threading.get_ident()
@@ -561,7 +565,7 @@ class GuiTests(unittest.TestCase):
         self.app.tick()
         self.assertEqual(self.player.play.call_count, 0)
         self.assertFalse(self.app.sample_job)
-        self.assertIn("取消", self.app.ui["speaker"]["preview_status"].cget("text"))
+        self.assertIn(tr("试听已取消"), self.app.ui["speaker"]["preview_status"].cget("text"))
 
     def test_recorded_audio_updates_preview_and_rebuild_restores_it(self):
         route = self.app.routes["mic"]
@@ -680,6 +684,25 @@ class GuiTests(unittest.TestCase):
         self.app.tick()
         self.assertTrue(self.app.closed)
 
+    def test_interface_pages_use_selected_language(self):
+        for expanded in (False, True):
+            if self.app.expanded != expanded:
+                self.app.toggle_layout()
+            for page, title in (("audio", "音频"), ("files", "文件"), ("settings", "设置")):
+                self.app.show_page(page)
+                self.root.update_idletasks()
+                self.assertEqual(self.app.heading.cget("text"), tr(title))
+            self.assertEqual(self.app.ui["mic"]["start"].cget("text"), tr("启用麦克风"))
+            self.assertEqual(self.app.file_start.cget("text"), tr("开始处理"))
+            if self.language == "en":
+                pending = [self.root]
+                while pending:
+                    widget = pending.pop()
+                    pending.extend(widget.winfo_children())
+                    if "text" in widget.keys():
+                        text = str(widget.cget("text"))
+                        self.assertFalse(any("\u4e00" <= c <= "\u9fff" for c in text), text)
+
     def test_settings_save_failure_is_reported_without_crashing(self):
         with patch.object(self.store, "save", side_effect=OSError("disk is read only")):
             self.app.save_config()
@@ -690,6 +713,11 @@ class GuiTests(unittest.TestCase):
         self.app.save_config()
         self.app.tick()
         self.assertNotIn("disk is read only", self.app.status.get())
+
+
+class EnglishGuiTests(GuiTests):
+    """Run the same audio/device workflows with English UI messages."""
+    language = "en"
 
 
 if __name__ == "__main__":

@@ -8,6 +8,8 @@ then noise removal; their combined algorithmic delay is flushed and removed.
 """
 from __future__ import annotations
 
+from ..i18n import tr
+
 from concurrent.futures import CancelledError
 import math
 import os
@@ -23,7 +25,7 @@ from .denoiser import Denoiser, HOP, LATENCY, RATE
 
 def _check_cancel(cancel):
     if cancel is not None and cancel.is_set():
-        raise CancelledError("Audio file processing was cancelled")
+        raise CancelledError(tr("Audio file processing was cancelled"))
 
 
 def _resampled_blocks(source: sf.SoundFile, output_frames: int, cancel=None):
@@ -43,9 +45,9 @@ def _resampled_blocks(source: sf.SoundFile, output_frames: int, cancel=None):
             chunk = source.read(min(65536, max(4096, needed - base - len(buffer))),
                                 dtype="float32", always_2d=True)
             if not len(chunk):
-                raise ValueError("Input audio ended before its declared frame count")
+                raise ValueError(tr("Input audio ended before its declared frame count"))
             if not np.isfinite(chunk).all():
-                raise ValueError("Input audio contains NaN or infinite samples")
+                raise ValueError(tr("Input audio contains NaN or infinite samples"))
             buffer = np.concatenate((buffer, chunk))
         fraction = ((positions % RATE) / RATE).astype(np.float32)[:, None]
         first = buffer[indices - base]
@@ -89,20 +91,20 @@ def process_file(
     if src.resolve() == dst.resolve() or (
         src.exists() and dst.exists() and os.path.samefile(src, dst)
     ):
-        raise ValueError("Choose a different output path to preserve the source recording")
+        raise ValueError(tr("Choose a different output path to preserve the source recording"))
     output_format = {".wav": "WAV", ".flac": "FLAC"}.get(dst.suffix.lower())
     if output_format is None:
-        raise ValueError("Output must be a .wav or .flac file")
+        raise ValueError(tr("Output must be a .wav or .flac file"))
     _check_cancel(cancel)
     started = time.perf_counter()
     temporary = None
     try:
         with sf.SoundFile(str(src)) as source:
             if source.format not in ("WAV", "WAVEX", "RF64", "FLAC", "OGG"):
-                raise ValueError("Input must be a WAV, FLAC or OGG audio file")
+                raise ValueError(tr("Input must be a WAV, FLAC or OGG audio file"))
             frames = (source.frames * RATE + source.samplerate // 2) // source.samplerate
             if not frames and output_format == "FLAC":
-                raise ValueError("Empty audio cannot be encoded as FLAC; choose WAV output")
+                raise ValueError(tr("Empty audio cannot be encoded as FLAC; choose WAV output"))
             stages = []
             for enabled, model, strength in (
                 (dereverb, "dereverb_48k.onnx", dereverb_strength),

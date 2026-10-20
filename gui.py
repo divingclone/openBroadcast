@@ -1,6 +1,8 @@
 """Broadcast 2.3-style audio controls, implemented with standard Tkinter."""
 from __future__ import annotations
 
+from .i18n import tr, readme_filename
+
 import queue
 import sys
 import time
@@ -175,9 +177,9 @@ class App:
         self.sample_effect = tk.BooleanVar(value=True)
         self.sample_selection = tk.StringVar(value=next(iter(self.sample_refs), ""))
         self.file_input, self.file_output = tk.StringVar(), tk.StringVar()
-        self.file_status = tk.StringVar(value="选择音频文件，应用麦克风效果设置。")
+        self.file_status = tk.StringVar(value=tr('选择音频文件，应用麦克风效果设置。'))
         self.file_progress = tk.DoubleVar()
-        self.status = tk.StringVar(value="就绪 · 仅音频")
+        self.status = tk.StringVar(value=tr('就绪 · 仅音频'))
         root.title("OPENBROADCAST")
         root.geometry("1120x820" if self.expanded else "560x820")
         root.minsize(560, 620)
@@ -345,8 +347,8 @@ class App:
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
         self.nav = {}
-        for name, icon, title in [("audio", "headphones", "音频"), ("files", "file", "文件"),
-                                  ("settings", "settings", "设置")]:
+        for name, icon, title in [("audio", "headphones", tr('音频')), ("files", "file", tr('文件')),
+                                  ("settings", "settings", tr('设置'))]:
             b = NavButton(sidebar, self, icon, title, lambda p=name: self.show_page(p))
             b.pack(fill="x", pady=(0, 2))
             self.nav[name] = b
@@ -361,7 +363,7 @@ class App:
         expand = IconButton(header, self, "collapse" if self.expanded else "expand", self.toggle_layout)
         expand.configure(bg=self.c["header"])
         expand.pack(side="right", padx=(12, 18))
-        tk.Label(header, text="仅音频", fg=self.c["muted"], bg=self.c["header"],
+        tk.Label(header, text=tr('仅音频'), fg=self.c["muted"], bg=self.c["header"],
                  font=(FONT,-11)).pack(side="right")
         footer = tk.Frame(main, bg=self.c["header"])
         footer.pack(side="bottom", fill="x")
@@ -382,7 +384,7 @@ class App:
             frame.pack_forget()
             self.nav[name].select(name == page)
         self.pages[page].pack(fill="both", expand=True)
-        self.heading.configure(text={"audio": "音频", "files": "文件", "settings": "设置"}[page])
+        self.heading.configure(text={"audio": tr('音频'), "files": tr('文件'), "settings": tr('设置')}[page])
 
     def toggle_layout(self):
         self.expanded = not self.expanded
@@ -437,14 +439,14 @@ class App:
             preview = right.body
         else:
             preview = left.body
-        for key, title in (("mic", "麦克风"), ("speaker", "扬声器")):
+        for key, title in (("mic", tr('麦克风')), ("speaker", tr('扬声器'))):
             controls = self.frame(left.body)
             controls.pack(fill="x", padx=16, pady=(16, 12))
             self.build_route(controls, key, title)
             tests = self.frame(preview)
             tests.pack(fill="x", padx=28 if self.expanded else 16, pady=(32 if key == "mic" else 22, 12))
             self.build_preview(tests, key, title)
-        self.button(left.body, "刷新设备", self.refresh_devices, bg=self.c["bg"],
+        self.button(left.body, tr('刷新设备'), self.refresh_devices, bg=self.c["bg"],
                     fg=self.c["muted"], highlightthickness=0, padx=0).pack(anchor="w", padx=16, pady=14)
 
     def device_combo(self, parent, key, role):
@@ -457,33 +459,34 @@ class App:
     def build_route(self, parent, key, title):
         self.ui[key] = {}
         self.device_combo(parent, key, "input" if key == "mic" else "output")
-        self.label(parent, title+"效果", font=(FONT, -16, "bold"), fg=GREEN).pack(anchor="w", pady=(18, 14))
-        self.effect(parent, key, "noise", "噪音消除",
-                    "降低背景噪音" if key == "mic" else "降低在扬声器上播放音频的背景噪音")
-        self.effect(parent, key, "dereverb", "房间回声消除",
-                    "降低混响音效" if key == "mic" else "降低在扬声器上播放音频的混响声音")
+        self.label(parent, tr('{title}效果', title=title), font=(FONT, -16, "bold"), fg=GREEN).pack(anchor="w", pady=(18, 14))
+        self.effect(parent, key, "noise", tr('噪音消除'),
+                    tr('降低背景噪音') if key == "mic" else tr('降低在扬声器上播放音频的背景噪音'))
+        self.effect(parent, key, "dereverb", tr('房间回声消除'),
+                    tr('降低混响音效') if key == "mic" else tr('降低在扬声器上播放音频的混响声音'))
         if key == "mic":
             row = self.frame(parent)
             row.pack(fill="x", pady=(8, 4))
-            self.label(row, "›  音棚音效", font=(FONT, -14, "bold"), muted=True).pack(side="left")
+            self.label(row, tr('›  音棚音效'), font=(FONT, -14, "bold"), muted=True).pack(side="left")
             Switch(row, self, tk.BooleanVar(value=False), disabled=True).pack(side="right")
-            self.label(parent, "提升音质，模拟高端录音室效果", muted=True,
+            self.label(parent, tr('提升音质，模拟高端录音室效果'), muted=True,
                        font=(FONT, -12)).pack(anchor="w", padx=16, pady=3)
-            self.label(parent, "尚未移植 · 当前项目未包含音棚音效模型", muted=True,
+            self.label(parent, tr('尚未移植 · 当前项目未包含音棚音效模型'), muted=True,
                        font=(FONT, -12)).pack(anchor="w", padx=16, pady=(6, 2))
             self.line(parent)
-        routing = self.disclosure(parent, "音频路由", state_key=f"{key}:routing")
+        routing = self.disclosure(parent, tr('音频路由'), state_key=f"{key}:routing")
         self.ui[key]["routing"] = routing
-        self.label(routing, "发送到（虚拟声卡 / 监听设备）" if key == "mic" else "接收来自（虚拟声卡录音端）",
+        self.label(routing, tr('发送到（虚拟声卡 / 监听设备）') if key == "mic" else tr('接收来自（虚拟声卡录音端）'),
                    muted=True, font=(FONT, -12)).pack(anchor="w")
         self.device_combo(routing, key, "output" if key == "mic" else "input")
         if key == "speaker":
-            self.label(routing, "将会议或播放器的输出设为虚拟声卡播放端。", muted=True,
+            self.label(routing, tr('将会议或播放器的输出设为虚拟声卡播放端。'), muted=True,
                        font=(FONT, -12)).pack(anchor="w")
-        self.ui[key]["start"] = self.button(routing.header, "启用"+title, lambda: self.toggle_route(key),
+        self.ui[key]["start"] = self.button(routing.header, tr("启用麦克风") if key == "mic" else tr("启用扬声器"),
+                                          lambda: self.toggle_route(key),
                                           accent=True, pady=4, font=(FONT, -12))
         self.ui[key]["start"].pack(side="right")
-        self.ui[key]["state"] = self.label(parent, "未启用", muted=True, anchor="w",
+        self.ui[key]["state"] = self.label(parent, tr('未启用'), muted=True, anchor="w",
                                          wraplength=400, justify="left", font=(FONT, -12))
         self.ui[key]["state"].pack(fill="x", pady=(4, 8))
 
@@ -510,7 +513,7 @@ class App:
         heading.pack(side="left", fill="x", expand=True)
         Switch(row, self, self.vars[key][effect], lambda: self.effects_changed(key)).pack(side="right")
         self.label(box, description, muted=True, font=(FONT, -12)).pack(anchor="w", padx=16, pady=(0, 4))
-        self.label(details, "强度", muted=True, font=(FONT, -12)).pack(side="left")
+        self.label(details, tr('强度'), muted=True, font=(FONT, -12)).pack(side="left")
         percent = self.label(details, f"{self.vars[key][effect+'_strength'].get():.0%}", muted=True,
                              width=4, font=(FONT, -12))
         percent.pack(side="right")
@@ -527,13 +530,13 @@ class App:
         meter = Meter(parent, self)
         self.ui[key]["meter"] = meter
         if key == "mic":
-            self.label(parent, title+"输出", muted=True, font=(FONT, -12)).pack(anchor="w")
+            self.label(parent, tr('{title}输出', title=title), muted=True, font=(FONT, -12)).pack(anchor="w")
             meter.pack(fill="x", pady=(4, 28))
         if not self.expanded:
             card = self.frame(parent, highlightbackground=self.c["line"], highlightthickness=1,
                               padx=12, pady=8)
             card.pack(fill="x")
-            parent = self.disclosure(card, "测试"+title+"效果", state_key=f"{key}:test")
+            parent = self.disclosure(card, tr('测试{title}效果', title=title), state_key=f"{key}:test")
             parent.heading.configure(fg=self.c["text"], font=(FONT, -14, "bold"))
         else:
             heading = self.frame(parent)
@@ -541,9 +544,9 @@ class App:
             icon = tk.Canvas(heading, width=24, height=24, bg=self.c["bg"], highlightthickness=0)
             icon.pack(side="left", padx=(0, 7))
             draw_icon(icon, "microphone" if key == "mic" else "speaker", 2, 2, 20, self.c["text"])
-            self.label(heading, "测试"+title+"效果", font=(FONT, -14, "bold")).pack(side="left")
-        self.label(parent, "录制一个样本，对比输入音频与处理后的输出音频。" if key == "mic" else
-                   "播放样本，了解音频处理如何减少噪音与混响。",
+            self.label(heading, tr('测试{title}效果', title=title), font=(FONT, -14, "bold")).pack(side="left")
+        self.label(parent, tr('录制一个样本，对比输入音频与处理后的输出音频。') if key == "mic" else
+                   tr('播放样本，了解音频处理如何减少噪音与混响。'),
                    muted=True, font=(FONT, -12), wraplength=450, justify="left").pack(anchor="w")
         if key == "speaker":
             sample_box = self.frame(parent, highlightbackground=self.c["line"], highlightthickness=1)
@@ -560,24 +563,24 @@ class App:
             IconButton(sample_row, self, "stop", self.stop_preview).pack(side="left", padx=(8, 0))
             options = self.frame(parent)
             options.pack(fill="x", pady=(4, 12))
-            self.button(options, "导入音频…", self.import_sample, bg=self.c["bg"], fg=self.c["muted"],
+            self.button(options, tr('导入音频…'), self.import_sample, bg=self.c["bg"], fg=self.c["muted"],
                         highlightthickness=0, padx=0).pack(side="left")
             Switch(options, self, self.sample_effect, self.sample_settings_changed).pack(side="right")
-            self.label(options, "应用效果", muted=True, font=(FONT, -12)).pack(side="right", padx=10)
-            record_parent = self.disclosure(parent, "录制当前扬声器音频", opened=False)
+            self.label(options, tr('应用效果'), muted=True, font=(FONT, -12)).pack(side="right", padx=10)
+            record_parent = self.disclosure(parent, tr('录制当前扬声器音频'), opened=False)
         else:
             record_parent = parent
         box = self.frame(record_parent, highlightbackground=self.c["line"], highlightthickness=1)
         box.pack(fill="x", pady=(14, 10))
         record = self.frame(box)
         record.pack(fill="x", padx=18, pady=11)
-        self.label(record, "录制语音" if key == "mic" else "录制音频", width=10, anchor="w").pack(side="left")
+        self.label(record, tr('录制语音') if key == "mic" else tr('录制音频'), width=10, anchor="w").pack(side="left")
         b = IconButton(record, self, "record", lambda: self.record(key))
         b.pack(side="left")
         self.ui[key]["record"] = b
         self.ui[key]["record_time"] = self.label(record, "00:00 / 00:20", muted=True, font=("Segoe UI", -11))
         self.ui[key]["record_time"].pack(side="right")
-        for which, text in ((0, "输入音频"), (1, "输出音频")):
+        for which, text in ((0, tr('输入音频')), (1, tr('输出音频'))):
             tk.Frame(box, height=1, bg=self.c["line"]).pack(fill="x")
             row = self.frame(box)
             row.pack(fill="x", padx=18, pady=10)
@@ -588,14 +591,14 @@ class App:
             wave = Waveform(row, self)
             wave.pack(side="left", fill="x", expand=True, padx=10)
             self.ui[key][f"play{which}"], self.ui[key][f"wave{which}"] = button, wave
-        self.ui[key]["save"] = self.button(record_parent, "保存录制的音频样本", lambda: self.save_recording(key),
+        self.ui[key]["save"] = self.button(record_parent, tr('保存录制的音频样本'), lambda: self.save_recording(key),
                                           state="disabled", bg=self.c["bg"], highlightthickness=0,
                                           padx=0, fg=self.c["muted"], font=(FONT,-12))
         self.ui[key]["save"].pack(anchor="w")
-        monitor = self.disclosure(parent, "试听设备", state_key=f"{key}:monitor")
+        monitor = self.disclosure(parent, tr('试听设备'), state_key=f"{key}:monitor")
         self.device_combo(monitor, key, "monitor")
         if key == "mic":
-            self.button(monitor, "停止试听", self.stop_preview, bg=self.c["bg"],
+            self.button(monitor, tr('停止试听'), self.stop_preview, bg=self.c["bg"],
                         highlightthickness=0).pack(anchor="w")
         self.ui[key]["preview_status"] = self.label(parent, "", muted=True, wraplength=450,
                                                    justify="left", font=(FONT, -12))
@@ -612,7 +615,7 @@ class App:
                 if self.config[key]["enabled"]:
                     self.pending_routes[key] = 0
                 route.stop()
-            self.status.set("正在刷新设备，完成后自动恢复音频…")
+            self.status.set(tr('正在刷新设备，完成后自动恢复音频…'))
             return
         self._refresh_devices()
 
@@ -623,7 +626,7 @@ class App:
         except Exception as exc:
             self.devices = []
             self.populate_devices()
-            messagebox.showerror("音频设备", str(exc), parent=self.root)
+            messagebox.showerror(tr('音频设备'), str(exc), parent=self.root)
 
     def populate_devices(self):
         for key in self.routes:
@@ -643,24 +646,25 @@ class App:
                     combo.current(matches[0])
                     self.config[key][role] = devices[matches[0]].key
                 elif len(matches) > 1:
-                    combo.set("存在同名设备，请重新选择")
+                    combo.set(tr('存在同名设备，请重新选择'))
                 elif saved:
-                    combo.set("设备不可用："+saved["name"])
+                    combo.set(tr('设备不可用：')+saved["name"])
                 elif not devices:
-                    combo.set("没有已启用且已连接的设备")
+                    combo.set(tr('没有已启用且已连接的设备'))
                 elif devices:
                     if role == "monitor" or (key == "speaker" and role == "output"):
                         combo.current(next((i for i, d in enumerate(devices) if d.default_output), 0))
                     elif key == "mic" and role == "input":
                         combo.current(next((i for i, d in enumerate(devices) if d.default_input), 0))
                     else:
-                        combo.set("请选择设备")
+                        combo.set(tr('请选择设备'))
 
     def selected(self, key, role):
         combo = self.ui[key][role]
         index = combo.current()
         if index < 0:
-            raise ValueError("请先选择"+{"input":"输入", "output":"输出", "monitor":"试听"}[role]+"设备。")
+            raise ValueError({"input": tr('请先选择输入设备。'), "output": tr('请先选择输出设备。'),
+                              "monitor": tr('请先选择试听设备。')}[role])
         return combo._devices[index]
 
     def device_changed(self, key, role):
@@ -700,10 +704,10 @@ class App:
             self.store.save(self.config)
             self._settings_error = ""
         except OSError as exc:
-            self._settings_error = "设置保存失败："+str(exc)
+            self._settings_error = tr('设置保存失败：')+str(exc)
             self.status.set(self._settings_error)
             if self.closing:
-                messagebox.showerror("设置保存失败", str(exc), parent=self.root)
+                messagebox.showerror(tr('设置保存失败'), str(exc), parent=self.root)
 
     def toggle_route(self, key):
         if self.closing:
@@ -725,7 +729,7 @@ class App:
             source, target = self.selected(key, "input"), self.selected(key, "output")
             if ("cable" in source.name.lower() and "cable" in target.name.lower()
                     and source.name.lower().replace("output", "input") == target.name.lower()):
-                raise ValueError("同一虚拟声卡的两端不能互相连接，会形成音频回路。")
+                raise ValueError(tr('同一虚拟声卡的两端不能互相连接，会形成音频回路。'))
             for role in ("input", "output"):
                 self.config[key][role] = self.selected(key, role).key
             self.schedule_save()
@@ -737,7 +741,7 @@ class App:
         except Exception as exc:
             self.route_errors[key] = str(exc)
             if report:
-                messagebox.showerror("无法启动音频", str(exc), parent=self.root)
+                messagebox.showerror(tr('无法启动音频'), str(exc), parent=self.root)
             return False
 
     def reconfigure_route(self, key):
@@ -762,7 +766,7 @@ class App:
                 for n in (0, 1):
                     self.ui[key][f"wave{n}"].set_audio(None)
         except Exception as exc:
-            messagebox.showinfo("录音测试", str(exc), parent=self.root)
+            messagebox.showinfo(tr('录音测试'), str(exc), parent=self.root)
 
     def play_recording(self, key, which):
         audio = self.routes[key].get_recording()
@@ -776,9 +780,9 @@ class App:
             self.player.play(audio, device.index)
             self.preview_context = (audio, key)
             self._playback_error = ""
-            self.ui[key]["preview_status"].configure(text="正在试听 · Esc 停止")
+            self.ui[key]["preview_status"].configure(text=tr('正在试听 · Esc 停止'))
         except Exception as exc:
-            messagebox.showerror("试听", str(exc), parent=self.root)
+            messagebox.showerror(tr('试听'), str(exc), parent=self.root)
 
     def stop_preview(self):
         self.preview_request = None
@@ -802,17 +806,17 @@ class App:
         if audio is None:
             return
         path = filedialog.asksaveasfilename(parent=self.root, defaultextension=".wav",
-                                           initialfile=key+"-processed.wav", filetypes=[("WAV 音频", "*.wav")])
+                                           initialfile=key+"-processed.wav", filetypes=[(tr('WAV 音频'), "*.wav")])
         if path:
             try:
                 import soundfile as sf
                 sf.write(path, audio[1], RATE, subtype="PCM_16")
-                self.ui[key]["preview_status"].configure(text="录音已保存："+Path(path).name)
+                self.ui[key]["preview_status"].configure(text=tr('录音已保存：')+Path(path).name)
             except Exception as exc:
-                messagebox.showerror("保存录音", str(exc), parent=self.root)
+                messagebox.showerror(tr('保存录音'), str(exc), parent=self.root)
 
     def import_sample(self):
-        path = filedialog.askopenfilename(parent=self.root, filetypes=[("音频", "*.wav *.flac *.ogg")])
+        path = filedialog.askopenfilename(parent=self.root, filetypes=[(tr('音频'), "*.wav *.flac *.ogg")])
         if path:
             self.sample_audio = Path(path)
             self.sample_choice.configure(values=[Path(path).name]+list(self.sample_refs))
@@ -833,15 +837,15 @@ class App:
             reference = self.sample_refs.get(choice)
             custom = self.sample_audio
             if reference is None and custom is None:
-                raise ValueError("未找到本机 Broadcast 样本，请导入试听文件。")
+                raise ValueError(tr('未找到本机 Broadcast 样本，请导入试听文件。'))
             options = (inference_options(self.config) if effects.noise or effects.dereverb else {})
         except Exception as exc:
-            messagebox.showinfo("试听样本", str(exc), parent=self.root)
+            messagebox.showinfo(tr('试听样本'), str(exc), parent=self.root)
             return
         self.sample_job = True
         self.sample_playing = True
         self.sample_cancel.clear()
-        self.ui["speaker"]["preview_status"].configure(text="正在处理试听样本…")
+        self.ui["speaker"]["preview_status"].configure(text=tr('正在处理试听样本…'))
         def worker():
             try:
                 if reference:
@@ -850,7 +854,7 @@ class App:
                     import soundfile as sf
                     with sf.SoundFile(custom) as source:
                         if source.samplerate != RATE:
-                            raise ValueError("试听文件需为 48 kHz；可先在文件页转换。")
+                            raise ValueError(tr('试听文件需为 48 kHz；可先在文件页转换。'))
                         data = source.read(RATE*30, dtype="float32", always_2d=True)
                 data = data[:RATE*30, :2]
                 stages = []
@@ -890,37 +894,37 @@ class App:
         scroll.pack(fill="both", expand=True)
         box = self.frame(scroll.body)
         box.pack(fill="x", padx=26, pady=26)
-        self.label(box, "音频文件处理", font=(FONT, -18, "bold")).pack(anchor="w")
-        self.label(box, "使用音频页中的麦克风效果与各自强度，保留声道并导出 48 kHz 音频。",
+        self.label(box, tr('音频文件处理'), font=(FONT, -18, "bold")).pack(anchor="w")
+        self.label(box, tr('使用音频页中的麦克风效果与各自强度，保留声道并导出 48 kHz 音频。'),
                    muted=True, wraplength=780, justify="left").pack(anchor="w", pady=12)
-        for var, title, save in ((self.file_input, "输入文件", False), (self.file_output, "输出文件", True)):
+        for var, title, save in ((self.file_input, tr('输入文件'), False), (self.file_output, tr('输出文件'), True)):
             self.label(box, title).pack(anchor="w", pady=(18, 6))
             row = self.frame(box)
             row.pack(fill="x")
             tk.Entry(row, textvariable=var, bg=self.c["field"], fg=self.c["text"],
                      insertbackground=self.c["text"], relief="flat").pack(side="left", fill="x", expand=True, ipady=9)
-            self.button(row, "浏览…", lambda s=save: self.choose_file(s)).pack(side="right", padx=(10, 0))
+            self.button(row, tr('浏览…'), lambda s=save: self.choose_file(s)).pack(side="right", padx=(10, 0))
         self.line(box)
         self.file_effect_label = self.label(box, "", muted=True, wraplength=780, justify="left")
         self.file_effect_label.pack(anchor="w", pady=6)
-        self.button(box, "调整音频效果", lambda: self.show_page("audio")).pack(anchor="w", pady=8)
+        self.button(box, tr('调整音频效果'), lambda: self.show_page("audio")).pack(anchor="w", pady=8)
         ttk.Progressbar(box, variable=self.file_progress, maximum=1).pack(fill="x", pady=(22, 14))
         self.label(box, textvariable=self.file_status, wraplength=800, justify="left").pack(anchor="w")
         actions = self.frame(box)
         actions.pack(fill="x", pady=20)
-        self.file_start = self.button(actions, "开始处理", self.process_file, accent=True)
+        self.file_start = self.button(actions, tr('开始处理'), self.process_file, accent=True)
         self.file_start.pack(side="left")
-        self.file_stop = self.button(actions, "取消", self.cancel_file, state="disabled")
+        self.file_stop = self.button(actions, tr('取消'), self.cancel_file, state="disabled")
         self.file_stop.pack(side="left", padx=12)
-        self.label(box, "支持 WAV / FLAC / OGG 输入，WAV / FLAC 输出。\n视频功能尚未实现。",
+        self.label(box, tr('支持 WAV / FLAC / OGG 输入，WAV / FLAC 输出。\n视频功能尚未实现。'),
                    muted=True, justify="left").pack(anchor="w", pady=20)
 
     def choose_file(self, save):
         if save:
             path = filedialog.asksaveasfilename(parent=self.root, defaultextension=".wav",
-                                               filetypes=[("WAV 音频", "*.wav"), ("FLAC 音频", "*.flac")])
+                                               filetypes=[(tr('WAV 音频'), "*.wav"), (tr('FLAC 音频'), "*.flac")])
         else:
-            path = filedialog.askopenfilename(parent=self.root, filetypes=[("音频文件", "*.wav *.flac *.ogg")])
+            path = filedialog.askopenfilename(parent=self.root, filetypes=[(tr('音频文件'), "*.wav *.flac *.ogg")])
         if path:
             (self.file_output if save else self.file_input).set(path)
             if not save and not self.file_output.get():
@@ -933,7 +937,7 @@ class App:
             self.file_restart = True
             self.file_restart_due = time.monotonic() + .3
             self.file_cancel.set()
-            self.file_status.set("设置已更改，正在按新设置重新处理…")
+            self.file_status.set(tr('设置已更改，正在按新设置重新处理…'))
 
     def cancel_file(self):
         self.file_restart = False
@@ -945,20 +949,20 @@ class App:
         src, dst = (self.file_request if restart else
                     (self.file_input.get().strip(), self.file_output.get().strip()))
         if not src or not dst:
-            messagebox.showinfo("音频文件", "请选择输入文件和输出位置。", parent=self.root)
+            messagebox.showinfo(tr('音频文件'), tr('请选择输入文件和输出位置。'), parent=self.root)
             return
         if not restart and Path(dst).exists() and Path(src).resolve() != Path(dst).resolve():
-            if not messagebox.askyesno("替换输出文件", f"是否替换已有文件？\n{dst}", parent=self.root):
+            if not messagebox.askyesno(tr('替换输出文件'), tr('是否替换已有文件？\n{dst}', dst=dst), parent=self.root):
                 return
         try:
             inference = inference_options(self.config)
         except ValueError as exc:
-            messagebox.showerror("推理设备", str(exc), parent=self.root)
+            messagebox.showerror(tr('推理设备'), str(exc), parent=self.root)
             return
         self.file_cancel.clear()
         self.file_request = (src, dst)
         self.file_progress.set(0)
-        self.file_status.set("正在载入模型…")
+        self.file_status.set(tr('正在载入模型…'))
         options = {k: v.get() for k, v in self.vars["mic"].items()}
         options.update(inference)
         def worker():
@@ -980,25 +984,25 @@ class App:
         box = self.frame(scroll.body)
         box.pack(fill="x", padx=26, pady=26)
         self.label(box, "OpenBroadcast", font=("Segoe UI", -26, "bold")).pack(anchor="w")
-        self.label(box, f"版本 {__version__}  ·  Tkinter / ONNX Runtime", muted=True).pack(anchor="w", pady=8)
-        self.label(box, "参考本机 NVIDIA Broadcast 2.3.0 的音频界面。\n独立移植项目，仅实现音频；视频功能尚未实现。",
+        self.label(box, tr('版本 {__version__}  ·  Tkinter / ONNX Runtime', __version__=__version__), muted=True).pack(anchor="w", pady=8)
+        self.label(box, tr('参考本机 NVIDIA Broadcast 2.3.0 的音频界面。\n独立移植项目，仅实现音频；视频功能尚未实现。'),
                    muted=True, justify="left", wraplength=750).pack(anchor="w", pady=8)
         self.line(box)
-        self.label(box, "音频处理", font=(FONT, -16, "bold")).pack(anchor="w")
-        self.label(box, "设置自动应用于正在运行的音频；切换设备时可能短暂中断。", muted=True,
+        self.label(box, tr('音频处理'), font=(FONT, -16, "bold")).pack(anchor="w")
+        self.label(box, tr('设置自动应用于正在运行的音频；切换设备时可能短暂中断。'), muted=True,
                    wraplength=750).pack(anchor="w", pady=10)
         row = self.frame(box)
         row.pack(fill="x", pady=10)
-        self.label(row, "推理设备", width=13, anchor="w").pack(side="left")
+        self.label(row, tr('推理设备'), width=13, anchor="w").pack(side="left")
         self.inference_mode = tk.StringVar(value=self.config["inference_mode"])
-        for value, title in (("cpu", "CPU 处理器"), ("gpu", "GPU 显卡")):
+        for value, title in (("cpu", tr('CPU 处理器')), ("gpu", tr('GPU 显卡'))):
             tk.Radiobutton(row, text=title, variable=self.inference_mode, value=value,
                            command=self.change_inference_mode, font=(FONT, -13),
                            bg=self.c["bg"], fg=self.c["text"], selectcolor=self.c["field"],
                            activebackground=self.c["bg"], activeforeground=GREEN,
                            highlightthickness=0).pack(side="left", padx=(0, 16))
         self.cpu_settings = self.frame(box)
-        self.label(self.cpu_settings, "CPU 线程", width=13, anchor="w").pack(side="left")
+        self.label(self.cpu_settings, tr('CPU 线程'), width=13, anchor="w").pack(side="left")
         threads = tk.StringVar(value=str(self.config["threads"]))
         spin = ttk.Spinbox(self.cpu_settings, from_=1, to=256, textvariable=threads, width=6)
         spin.pack(side="left")
@@ -1022,7 +1026,7 @@ class App:
         spin.bind("<FocusOut>", commit)
         spin.bind("<Return>", commit)
         self.gpu_settings = self.frame(box)
-        self.label(self.gpu_settings, "推理显卡", muted=True).pack(anchor="w", pady=(0, 8))
+        self.label(self.gpu_settings, tr('推理显卡'), muted=True).pack(anchor="w", pady=(0, 8))
         self.gpu_combo = ttk.Combobox(self.gpu_settings, values=[d.label for d in self.gpus],
                                       state="readonly", width=28)
         self.gpu_combo.pack(fill="x")
@@ -1030,42 +1034,37 @@ class App:
         if device:
             self.gpu_combo.current(self.gpus.index(device))
         elif self.config["gpu"]:
-            self.gpu_combo.set("显卡已变更：" + self.config["gpu"]["name"])
+            self.gpu_combo.set(tr('显卡已变更：') + self.config["gpu"]["name"])
         else:
-            self.gpu_combo.set("请选择显卡" if self.gpus else "未检测到可选择的显卡")
+            self.gpu_combo.set(tr('请选择显卡') if self.gpus else tr('未检测到可选择的显卡'))
         self.gpu_combo.bind("<<ComboboxSelected>>", self.change_gpu)
         self.inference_hint = self.label(box, "", muted=True, justify="left", wraplength=390)
         self.inference_hint.pack(anchor="w", pady=(10, 0))
         self.update_inference_controls()
         self.line(box)
-        self.label(box, "外观", font=(FONT, -16, "bold")).pack(anchor="w", pady=(0, 14))
+        self.label(box, tr('外观'), font=(FONT, -16, "bold")).pack(anchor="w", pady=(0, 14))
         row = self.frame(box)
         row.pack(fill="x")
-        self.label(row, "显示实时处理性能").pack(side="left")
+        self.label(row, tr('显示实时处理性能')).pack(side="left")
         perf = tk.BooleanVar(value=self.config["show_performance"])
         Switch(row, self, perf, lambda: self.setting("show_performance", perf.get())).pack(side="left", padx=18)
         row = self.frame(box)
         row.pack(fill="x", pady=18)
-        self.label(row, "主题").pack(side="left", padx=(0, 24))
-        self.button(row, "深色", lambda: self.theme("dark")).pack(side="left", padx=4)
-        self.button(row, "浅色", lambda: self.theme("light")).pack(side="left", padx=4)
+        self.label(row, tr('主题')).pack(side="left", padx=(0, 24))
+        self.button(row, tr('深色'), lambda: self.theme("dark")).pack(side="left", padx=4)
+        self.button(row, tr('浅色'), lambda: self.theme("light")).pack(side="left", padx=4)
         self.line(box)
-        self.label(box, "音频连接", font=(FONT, -16, "bold")).pack(anchor="w")
+        self.label(box, tr('音频连接'), font=(FONT, -16, "bold")).pack(anchor="w")
         help_text = (
-            "麦克风：真实麦克风 → OpenBroadcast → 虚拟声卡播放端 → 通话软件。\n"
-            "扬声器：通话软件 → 另一条虚拟声卡 → OpenBroadcast → 耳机。\n\n"
-            "两路同时使用时，请用不同的虚拟声卡，避免循环。程序不安装虚拟驱动。\n"
-            "音棚音效模型尚未移植，界面中已禁用该项。降噪与去混响可独立使用。\n\n"
-            "快捷键：Ctrl+1 音频 · Ctrl+2 文件 · Ctrl+3 设置 · Esc 停止试听。\n"
-            "设备与强度自动保存；启动程序时自动恢复上次启用的音频路由。"
+            tr('麦克风：真实麦克风 → OpenBroadcast → 虚拟声卡播放端 → 通话软件。\n扬声器：通话软件 → 另一条虚拟声卡 → OpenBroadcast → 耳机。\n\n两路同时使用时，请用不同的虚拟声卡，避免循环。程序不安装虚拟驱动。\n音棚音效模型尚未移植，界面中已禁用该项。降噪与去混响可独立使用。\n\n快捷键：Ctrl+1 音频 · Ctrl+2 文件 · Ctrl+3 设置 · Esc 停止试听。\n设备与强度自动保存；启动程序时自动恢复上次启用的音频路由。')
         )
         self.label(box, help_text, muted=True, wraplength=750, justify="left").pack(anchor="w", pady=14)
-        self.button(box, "打开使用说明", self.show_readme).pack(anchor="w", pady=8)
+        self.button(box, tr('打开使用说明'), self.show_readme).pack(anchor="w", pady=8)
         self.line(box)
-        self.label(box, "后台运行", font=(FONT, -16, "bold")).pack(anchor="w")
+        self.label(box, tr('后台运行'), font=(FONT, -16, "bold")).pack(anchor="w")
         row = self.frame(box)
         row.pack(fill="x", pady=12)
-        self.label(row, "开机自启（登录 Windows 后）").pack(side="left")
+        self.label(row, tr('开机自启（登录 Windows 后）')).pack(side="left")
         try:
             enabled = startup.is_enabled()
         except OSError:
@@ -1074,14 +1073,11 @@ class App:
         self.startup_switch = Switch(row, self, self.startup_enabled, self.change_startup,
                                      disabled=sys.platform != "win32")
         self.startup_switch.pack(side="left", padx=18)
-        self.label(box, "登录后进入托盘，并恢复上次启用的音频路由。\n"
-                   "移动便携目录后，请关闭再开启此选项以更新路径。",
+        self.label(box, tr('登录后进入托盘，并恢复上次启用的音频路由。\n移动便携目录后，请关闭再开启此选项以更新路径。'),
                    muted=True, wraplength=750, justify="left").pack(anchor="w")
-        self.label(box, "Windows：关闭主窗口会隐藏到右下角系统托盘，音频处理继续运行。\n"
-                   "点击托盘图标可恢复窗口；右键选择“退出 OpenBroadcast”可完全退出。\n"
-                   "标题栏的最小化按钮仍最小化到任务栏。",
+        self.label(box, tr('Windows：关闭主窗口会隐藏到右下角系统托盘，音频处理继续运行。\n点击托盘图标可恢复窗口；右键选择“退出 OpenBroadcast”可完全退出。\n标题栏的最小化按钮仍最小化到任务栏。'),
                    muted=True, wraplength=750, justify="left").pack(anchor="w", pady=14)
-        self.button(box, "退出 OpenBroadcast", self.request_exit).pack(anchor="w", pady=8)
+        self.button(box, tr('退出 OpenBroadcast'), self.request_exit).pack(anchor="w", pady=8)
 
     def change_inference_mode(self):
         self.config["inference_mode"] = self.inference_mode.get()
@@ -1110,15 +1106,15 @@ class App:
         (self.cpu_settings if cpu else self.gpu_settings).pack(
             fill="x", pady=10, before=self.inference_hint)
         if cpu:
-            hint = "使用 CPU 处理音频，已选显卡不会参与推理。"
+            hint = tr('使用 CPU 处理音频，已选显卡不会参与推理。')
         else:
             device = selected_gpu(self.config, self.gpus)
             if device and device.available:
-                hint = "使用所选显卡处理音频；切换后自动重新载入模型，无需重启程序。"
+                hint = tr('使用所选显卡处理音频；切换后自动重新载入模型，无需重启程序。')
             elif device:
-                hint = "已检测到显卡，但当前运行库不支持该 GPU 后端。\n请按使用说明安装 GPU 运行库并重启，或切换到 CPU。"
+                hint = tr('已检测到显卡，但当前运行库不支持该 GPU 后端。\n请按使用说明安装 GPU 运行库并重启，或切换到 CPU。')
             else:
-                hint = "请重新选择显卡；若列表为空，请检查驱动及 GPU 运行库。"
+                hint = tr('请重新选择显卡；若列表为空，请检查驱动及 GPU 运行库。')
         self.inference_hint.configure(text=hint)
 
     def setting(self, key, value):
@@ -1135,7 +1131,7 @@ class App:
         except OSError as exc:
             self.startup_enabled.set(not self.startup_enabled.get())
             self.startup_switch.draw()
-            messagebox.showerror("开机自启", str(exc), parent=self.root)
+            messagebox.showerror(tr('开机自启'), str(exc), parent=self.root)
 
     def theme(self, name):
         self.setting("theme", name)
@@ -1143,7 +1139,7 @@ class App:
 
     def show_readme(self):
         window = tk.Toplevel(self.root)
-        window.title("OpenBroadcast 使用说明")
+        window.title(tr('OpenBroadcast 使用说明'))
         window.geometry("800x650")
         text = tk.Text(window, wrap="word", bg=self.c["bg"], fg=self.c["text"],
                        font=(FONT, -13), padx=20, pady=20)
@@ -1151,7 +1147,7 @@ class App:
         scroll.pack(side="right", fill="y")
         text.configure(yscrollcommand=scroll.set)
         text.pack(fill="both", expand=True)
-        text.insert("1.0", Path(__file__).with_name("README.md").read_text(encoding="utf-8"))
+        text.insert("1.0", Path(__file__).with_name(readme_filename()).read_text(encoding="utf-8"))
         text.configure(state="disabled")
 
     def tick(self):
@@ -1180,25 +1176,24 @@ class App:
                 self.tray_ready = self.tray_hide_pending = False
                 if not self.closing:
                     self.restore_window()
-                    messagebox.showerror("系统托盘不可用",
-                                         f"窗口已保留，音频处理继续运行。\n{payload}\n\n"
-                                         "可使用标题栏最小化，或在设置页选择“退出 OpenBroadcast”。",
+                    messagebox.showerror(tr('系统托盘不可用'),
+                                         tr('窗口已保留，音频处理继续运行。\n{payload}\n\n可使用标题栏最小化，或在设置页选择“退出 OpenBroadcast”。', payload=payload),
                                          parent=self.root)
             elif kind == "progress":
                 self.file_progress.set(float(payload))
-                self.file_status.set(f"正在处理… {float(payload):.0%}")
+                self.file_status.set(tr('正在处理… {value0:.0%}', value0=float(payload)))
             elif kind == "file_done":
                 self.file_progress.set(1)
-                self.file_status.set("已完成："+str(payload["output"]))
+                self.file_status.set(tr('已完成：')+str(payload["output"]))
             elif kind in ("file_error", "file_cancelled"):
-                self.file_status.set("已取消，目标文件保持不变。" if kind == "file_cancelled" else "处理失败："+payload)
+                self.file_status.set(tr('已取消，目标文件保持不变。') if kind == "file_cancelled" else tr('处理失败：')+payload)
             elif kind.startswith("sample"):
                 self.sample_job = False
                 if kind == "sample" and not self.closing and not self.sample_cancel.is_set():
                     self.play(payload, "speaker")
                 else:
                     self.ui["speaker"]["preview_status"].configure(
-                        text="试听已取消" if kind in ("sample_cancelled", "sample") else str(payload))
+                        text=tr('试听已取消') if kind in ("sample_cancelled", "sample") else str(payload))
         if not self.closing:
             if self.refresh_pending and not (self.player.busy or self.sample_job or
                                             any(r.busy for r in self.routes.values())):
@@ -1230,24 +1225,24 @@ class App:
             ui = self.ui[key]
             running = state in ("loading", "running", "stopping")
             ui["start"].configure(
-                text="取消切换" if key in self.pending_routes else {"loading":"停止加载", "running":"停止", "stopping":"正在停止…"}.get(
-                    state, "启用"+("麦克风" if key == "mic" else "扬声器")),
+                text=tr('取消切换') if key in self.pending_routes else {"loading":tr('停止加载'), "running":tr('停止'), "stopping":tr('正在停止…')}.get(
+                    state, tr('启用麦克风') if key == "mic" else tr('启用扬声器')),
                 state="disabled" if self.closing else "normal")
             for role in ("input", "output"):
                 ui[role].configure(state="disabled" if self.closing else "readonly")
             ui["meter"].draw(snap["output_peak"] if state == "running" else 0)
-            text = {"idle":"未启用", "loading":"正在载入模型与打开音频设备…",
-                    "stopping":"正在释放音频设备…", "error":"错误："+str(snap["error"])}.get(state)
+            text = {"idle":tr('未启用'), "loading":tr('正在载入模型与打开音频设备…'),
+                    "stopping":tr('正在释放音频设备…'), "error":tr('错误：')+str(snap["error"])}.get(state)
             if key in self.pending_routes:
-                text = "正在应用新设置，完成后自动恢复…"
+                text = tr('正在应用新设置，完成后自动恢复…')
             elif key in self.route_errors:
-                text = "无法恢复音频："+self.route_errors[key]
+                text = tr('无法恢复音频：')+self.route_errors[key]
             if state == "running":
-                active.append("麦克风" if key == "mic" else "扬声器")
+                active.append(tr('麦克风') if key == "mic" else tr('扬声器'))
                 total_ms += snap["process_ms"]
-                text = f"运行中 · {snap['channels']} 声道 · 模型延迟 {snap['latency_ms']:.0f} ms + 缓冲"
+                text = tr('运行中 · {value0} 声道 · 模型延迟 {value1:.0f} ms + 缓冲', value0=snap['channels'], value1=snap['latency_ms'])
                 if self.config["show_performance"]:
-                    text += f"\n处理 {snap['process_ms']:.1f} ms / 10 ms · 丢帧 {snap['input_drop'] + snap['output_drop']} · 欠载 {snap['output_underrun']}"
+                    text += tr('\n处理 {value0:.1f} ms / 10 ms · 丢帧 {value1} · 欠载 {value2}', value0=snap['process_ms'], value1=snap['input_drop'] + snap['output_drop'], value2=snap['output_underrun'])
             ui["state"].configure(text=text or state)
             ui["record"].configure(icon="stop" if snap["recording"] else "record",
                                     state="normal" if state == "running" else "disabled")
@@ -1266,20 +1261,19 @@ class App:
         self.ui["speaker"]["sample"].configure(state="disabled" if self.sample_job else "normal")
         if self.player.error and self._playback_error != self.player.error:
             self._playback_error = self.player.error
-            self.status.set("试听失败："+self.player.error)
+            self.status.set(tr('试听失败：')+self.player.error)
         elif not self.player.error:
             if self.player.active:
-                self.status.set(f"试听 {self.player.position/RATE:.1f} / {self.player.total/RATE:.1f} 秒 · Esc 停止")
+                self.status.set(tr('试听 {value0:.1f} / {value1:.1f} 秒 · Esc 停止', value0=self.player.position / RATE, value1=self.player.total / RATE))
             elif active:
-                self.status.set(" + ".join(active)+"运行中"+(f" · 每 10 ms 处理耗时 {total_ms:.1f} ms" if self.config["show_performance"] else ""))
+                self.status.set(" + ".join(active)+tr('运行中')+(tr(' · 每 10 ms 处理耗时 {total_ms:.1f} ms', total_ms=total_ms) if self.config["show_performance"] else ""))
             else:
-                self.status.set("就绪 · 仅音频 · 视频功能尚未实现")
+                self.status.set(tr('就绪 · 仅音频 · 视频功能尚未实现'))
         file_busy = bool(self.file_thread and self.file_thread.is_alive()) or self.file_restart
         self.file_start.configure(state="disabled" if file_busy or self.closing else "normal")
         self.file_stop.configure(state="normal" if file_busy else "disabled")
         e = self.effects("mic")
-        self.file_effect_label.configure(text=f"当前效果：噪音消除 {'开启' if e.noise else '关闭'} ({e.noise_strength:.0%})"
-                                        f"  ·  房间回声消除 {'开启' if e.dereverb else '关闭'} ({e.dereverb_strength:.0%})")
+        self.file_effect_label.configure(text=tr('当前效果：噪音消除 {value0} ({value1:.0%})  ·  房间回声消除 {value2} ({value3:.0%})', value0=tr('开启') if e.noise else tr('关闭'), value1=e.noise_strength, value2=tr('开启') if e.dereverb else tr('关闭'), value3=e.dereverb_strength))
         if self.closing:
             busy = file_busy or self.player.busy or self.sample_job or any(
                 r.busy for r in self.routes.values())
@@ -1287,7 +1281,7 @@ class App:
                 self.closed = True
                 self.root.destroy()
                 return
-            self.status.set("正在停止音频并释放资源…")
+            self.status.set(tr('正在停止音频并释放资源…'))
         elif self._settings_error:
             self.status.set(self._settings_error)
         self.root.after(100, self.tick)

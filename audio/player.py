@@ -1,6 +1,8 @@
 """Independent, interruptible preview playback; never uses sounddevice.play()."""
 from __future__ import annotations
 
+from ..i18n import tr
+
 import threading
 from contextlib import ExitStack
 import numpy as np
@@ -19,12 +21,12 @@ class PreviewPlayer:
 
     def play(self, audio, device):
         if self.busy:
-            raise RuntimeError("请先停止当前试听。")
+            raise RuntimeError(tr('请先停止当前试听。'))
         data = np.asarray(audio, dtype=np.float32)
         if data.ndim == 1:
             data = data[:, None]
         if data.ndim != 2 or not data.shape[0] or not data.shape[1] or not np.isfinite(data).all():
-            raise ValueError("没有可播放的音频。")
+            raise ValueError(tr('没有可播放的音频。'))
         data = data.copy()
         self.position, self.total, self.error = 0, len(data), ""
         self._stop.clear()
@@ -37,7 +39,7 @@ class PreviewPlayer:
                 import sounddevice as sd
                 maximum = int(sd.query_devices(device)["max_output_channels"])
                 if maximum < 1:
-                    raise ValueError("请选择可播放音频的设备。")
+                    raise ValueError(tr('请选择可播放音频的设备。'))
                 # Shared WASAPI speaker endpoints commonly require stereo even
                 # for mono recordings. Prefer stereo, then probe the device's
                 # native count before falling back to its source count.
@@ -54,7 +56,7 @@ class PreviewPlayer:
                     except Exception as exc:
                         failure = exc
                 else:
-                    raise ValueError(f"此设备不支持 48 kHz 音频试听：{failure}")
+                    raise ValueError(tr('此设备不支持 48 kHz 音频试听：{failure}', failure=failure))
                 if self._stop.is_set():
                     return
                 with sd.OutputStream(samplerate=RATE, channels=channels, dtype="float32",

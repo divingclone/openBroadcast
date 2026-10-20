@@ -11,6 +11,8 @@ ROCm, OpenVINO or CUDA when those providers are installed.
 """
 from __future__ import annotations
 
+from ..i18n import tr
+
 from collections import deque
 from pathlib import Path
 from typing import Iterable, Mapping
@@ -167,8 +169,7 @@ class Denoiser:
             str(self.model_path), sess_options=options, providers=provider_list
         )
         if not any(p in session.get_providers() for p in chosen):
-            raise RuntimeError("所选推理后端初始化失败，请检查 GPU 运行库及驱动，"
-                               "或在设置中切换到 CPU。")
+            raise RuntimeError(tr('所选推理后端初始化失败，请检查 GPU 运行库及驱动，或在设置中切换到 CPU。'))
         return session
 
     def set_intensity(self, intensity: float) -> None:
@@ -293,7 +294,7 @@ class Denoiser:
     def process(self, samples: Iterable[float]) -> np.ndarray:
         samples = np.asarray(samples, dtype=np.float32)
         if samples.shape != (HOP,) or not np.isfinite(samples).all():
-            raise ValueError("Expected 480 finite mono samples")
+            raise ValueError(tr("Expected 480 finite mono samples"))
         self.pending.append(samples.copy())
         if len(self.pending) == 4:
             block = np.concatenate(self.pending)
@@ -306,7 +307,7 @@ class Denoiser:
     def process_audio(self, samples: Iterable[float]) -> np.ndarray:
         samples = np.asarray(samples, dtype=np.float32)
         if samples.ndim != 1 or not np.isfinite(samples).all():
-            raise ValueError("Expected finite mono audio")
+            raise ValueError(tr("Expected finite mono audio"))
         self.reset()
         if not samples.size:
             return samples.copy()
@@ -363,11 +364,11 @@ def read_wav(path: str | Path) -> np.ndarray:
 
     with wave.open(str(path), "rb") as f:
         if f.getsampwidth() != 2 or f.getcomptype() != "NONE":
-            raise ValueError("Use a 16-bit PCM WAV file")
+            raise ValueError(tr("Use a 16-bit PCM WAV file"))
         rate, channels = f.getframerate(), f.getnchannels()
         audio = np.frombuffer(f.readframes(f.getnframes()), "<i2").astype(np.float32)
     if rate != RATE:
-        raise ValueError("NVIDIA Broadcast's 48 kHz model requires 48 kHz audio")
+        raise ValueError(tr("NVIDIA Broadcast's 48 kHz model requires 48 kHz audio"))
     return audio.reshape(-1, channels).mean(axis=1) / np.float32(32768)
 
 

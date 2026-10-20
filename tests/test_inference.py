@@ -21,7 +21,7 @@ class InferenceTests(unittest.TestCase):
         session.get_providers.return_value = [CPU]
         with patch("openbroadcast.audio.denoiser.ort.get_available_providers", return_value=[CPU, DML]), \
              patch("openbroadcast.audio.denoiser.ort.InferenceSession", return_value=session):
-            with self.assertRaisesRegex(RuntimeError, "初始化失败"):
+            with self.assertRaisesRegex(RuntimeError, "初始化失败|failed to initialize"):
                 processor._create_session(DML, 0, 2, None)
 
     def test_cpu_ignores_saved_gpu_and_legacy_index(self):

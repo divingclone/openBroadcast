@@ -25,6 +25,12 @@ macOS 需使用带 Tk 的 Python。安装依赖后运行 `python run_gui.pyw`。
 默认使用 CPU，可在“设置”中切换至 GPU 并选择显卡。
 Windows 版支持兼容 DirectX 12 的 NVIDIA、AMD、Intel 显卡，需安装正常工作的显卡驱动。
 
+## 界面语言
+
+程序在启动时自动选择语言：中文系统使用简体中文，其他语言使用英文。
+Windows 根据用户的系统显示语言识别；Linux 和 macOS 按 `LC_ALL`、`LC_MESSAGES`、`LANG` 的优先级读取语言环境，没有设置时使用系统区域语言。
+界面、托盘菜单和内置使用说明会使用对应语言。更改系统语言后，请重新启动程序。
+
 ## 将处理后的声音用于通话
 
 Windows 需另行安装 [VB-CABLE 虚拟音频线](https://vb-audio.com/Cable/)：

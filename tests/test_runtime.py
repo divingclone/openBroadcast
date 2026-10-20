@@ -302,11 +302,11 @@ class RuntimeTests(unittest.TestCase):
         self.route._input_callback(np.ones((13, 1), np.float32), 13, None, False)
         eventually(lambda: self.route.snapshot()["state"] == "error")
         self.route.stop(wait=True)
-        self.assertIn("13 frames", self.route.snapshot()["error"])
+        self.assertRegex(self.route.snapshot()["error"], "13 frames|13 帧")
         self.start(EffectSettings(noise=False))
         self.sd.streams[-1].active = False
         eventually(lambda: self.route.snapshot()["state"] == "error")
-        self.assertIn("disconnected", self.route.snapshot()["error"])
+        self.assertRegex(self.route.snapshot()["error"], "disconnected|断开连接")
 
     def test_output_underrun_and_queue_overflow_statistics(self):
         self.start(EffectSettings(noise=False))

@@ -7,6 +7,7 @@ import math
 import os
 from pathlib import Path
 import tempfile
+from .i18n import tr
 
 
 _CHANNEL_DEFAULTS = {
@@ -122,7 +123,8 @@ class SettingsStore:
             os.replace(temporary, self.path)
             temporary = None
         except OSError as exc:
-            raise OSError(f"Could not save OpenBroadcast settings to {self.path}: {exc}") from exc
+            raise OSError(tr("Could not save OpenBroadcast settings to {path}: {error}",
+                             path=self.path, error=exc)) from exc
         finally:
             if temporary is not None:
                 try:

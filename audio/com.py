@@ -1,4 +1,6 @@
 """COM lifetime for Windows audio workers (WASAPI uses COM per thread)."""
+
+from ..i18n import tr
 from contextlib import contextmanager
 import sys
 
@@ -18,7 +20,7 @@ def audio_thread(ole32=None):
     result = ole32.CoInitializeEx(None, 0) & 0xffffffff  # COINIT_MULTITHREADED
     # An existing STA is already initialized; don't undo someone else's COM.
     if result not in (0, 1, 0x80010106):  # S_OK, S_FALSE, RPC_E_CHANGED_MODE
-        raise OSError(f"Windows 音频线程初始化失败 (COM 0x{result:08X})")
+        raise OSError(tr('Windows 音频线程初始化失败 (COM 0x{result:08X})', result=result))
     try:
         yield
     finally:

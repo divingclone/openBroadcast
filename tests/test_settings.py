@@ -50,7 +50,7 @@ class SettingsTests(unittest.TestCase):
         self.store.save(DEFAULT_SETTINGS)
         previous = self.path.read_bytes()
         with patch("openbroadcast.settings.os.replace", side_effect=PermissionError("locked")):
-            with self.assertRaisesRegex(OSError, "Could not save OpenBroadcast settings"):
+            with self.assertRaisesRegex(OSError, "Could not save OpenBroadcast settings|无法将 OpenBroadcast 设置保存"):
                 self.store.save({"threads": 8})
         self.assertEqual(self.path.read_bytes(), previous)
         self.assertEqual(list(self.path.parent.iterdir()), [self.path])

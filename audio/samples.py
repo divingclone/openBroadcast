@@ -4,6 +4,8 @@ No NVIDIA sample assets are copied into, or required by, this project.
 """
 from __future__ import annotations
 
+from ..i18n import tr
+
 import io
 import json
 import os
@@ -53,16 +55,16 @@ def read_sample(reference):
     archive, offset, size = reference
     if (type(offset) is not int or type(size) is not int
             or offset < 0 or not 0 < size <= MAX_SAMPLE_BYTES):
-        raise ValueError("试听样本大小或位置无效。")
+        raise ValueError(tr('试听样本大小或位置无效。'))
     archive = Path(archive)
     with archive.open("rb") as f:
         if offset + size > os.fstat(f.fileno()).st_size:
-            raise ValueError("试听样本已损坏或安装文件已更改。")
+            raise ValueError(tr('试听样本已损坏或安装文件已更改。'))
         f.seek(offset)
         payload = f.read(size)
         if len(payload) != size:
-            raise ValueError("试听样本读取不完整。")
+            raise ValueError(tr('试听样本读取不完整。'))
         audio, rate = sf.read(io.BytesIO(payload), dtype="float32", always_2d=True)
     if rate != RATE:
-        raise ValueError(f"此样本为 {rate} Hz；请通过文件页转换为 48 kHz。")
+        raise ValueError(tr('此样本为 {rate} Hz；请通过文件页转换为 48 kHz。', rate=rate))
     return audio

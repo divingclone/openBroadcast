@@ -25,6 +25,12 @@ The project is primarily tested on Windows.
 Processing uses the CPU by default. You can switch to GPU processing and select a graphics card in Settings (设置).
 The Windows version supports DirectX 12-compatible NVIDIA, AMD, and Intel GPUs with working graphics drivers.
 
+## Interface language
+
+The app automatically selects its language at startup. Chinese system languages use Simplified Chinese; all other languages use English.
+On Windows, detection uses your Windows display language. On Linux and macOS, it uses the locale environment (`LC_ALL`, `LC_MESSAGES`, then `LANG`), falling back to the system locale.
+The interface, tray menu, and built-in user guide follow this selection. Restart the app after changing your system language.
+
 ## Using processed audio in calls
 
 On Windows, install [VB-CABLE Virtual Audio Cable](https://vb-audio.com/Cable/) separately:

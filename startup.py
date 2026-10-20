@@ -1,4 +1,6 @@
 """Opt-in Windows logon startup for the current portable/source location."""
+
+from .i18n import tr
 from pathlib import Path
 import subprocess
 import sys
@@ -14,12 +16,12 @@ def startup_command():
     else:
         pythonw = executable.with_name("pythonw.exe")
         if not pythonw.is_file():
-            raise OSError("找不到 pythonw.exe，请使用 Windows Python 或便携版。")
+            raise OSError(tr('找不到 pythonw.exe，请使用 Windows Python 或便携版。'))
         args = [str(pythonw), str(Path(__file__).resolve().with_name("run_gui.pyw")),
                 "--background"]
     command = subprocess.list2cmdline(args)
     if len(command) > 260:
-        raise OSError("程序路径过长，无法注册开机自启；请移到更短的目录。")
+        raise OSError(tr('程序路径过长，无法注册开机自启；请移到更短的目录。'))
     return command
 
 
@@ -37,7 +39,7 @@ def is_enabled():
 
 def set_enabled(enabled):
     if sys.platform != "win32":
-        raise OSError("开机自启目前仅支持 Windows。")
+        raise OSError(tr('开机自启目前仅支持 Windows。'))
     import winreg
     if enabled:
         command = startup_command()

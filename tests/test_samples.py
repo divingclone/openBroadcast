@@ -98,7 +98,7 @@ class SampleTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     read_sample((self.archive, offset, size))
         self.archive.write_bytes(b"changed")
-        with self.assertRaisesRegex(ValueError, "已损坏"):
+        with self.assertRaisesRegex(ValueError, "已损坏|damaged"):
             read_sample(reference)
 
 

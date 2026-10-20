@@ -115,7 +115,7 @@ class FileTests(unittest.TestCase):
     def test_source_cannot_be_overwritten(self):
         self.write_source()
         before = self.input.read_bytes()
-        with self.assertRaisesRegex(ValueError, "different output path"):
+        with self.assertRaisesRegex(ValueError, "different output path|不同的输出路径"):
             files.process_file(self.input, self.input, noise=False)
         self.assertEqual(self.input.read_bytes(), before)
 
@@ -137,7 +137,7 @@ class FileTests(unittest.TestCase):
 
     def test_empty_flac_output_rejected(self):
         sf.write(self.input, np.empty((0, 2)), 48000)
-        with self.assertRaisesRegex(ValueError, "Empty audio"):
+        with self.assertRaisesRegex(ValueError, "Empty audio|空音频"):
             files.process_file(self.input, self.folder / "output.flac", noise=False)
 
     def test_ogg_input_and_flac_output(self):

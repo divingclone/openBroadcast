@@ -6,6 +6,8 @@ routes may therefore run independently. Device indices are session-local.
 """
 from __future__ import annotations
 
+from ..i18n import tr
+
 from collections import deque
 from contextlib import ExitStack
 from dataclasses import dataclass
@@ -177,12 +179,12 @@ class AudioRoute:
         threads: int = 2, device_id: int = 0,
     ) -> None:
         if channels not in (1, 2):
-            raise ValueError("Only mono and stereo routes are supported")
+            raise ValueError(tr("Only mono and stereo routes are supported"))
         if input_device is None or output_device is None:
-            raise ValueError("Select both input and output devices")
+            raise ValueError(tr("Select both input and output devices"))
         with self._lock:
             if self._thread and self._thread.is_alive():
-                raise RuntimeError("The route is still running or stopping")
+                raise RuntimeError(tr("The route is still running or stopping"))
             self._effects = effects or self._effects
             self._stats = self._initial_stats()
             self._stats.update(state="loading", channels=channels)
@@ -215,12 +217,12 @@ class AudioRoute:
 
     def start_recording(self, max_seconds: float = 20) -> None:
         if not math.isfinite(max_seconds) or not 0 < max_seconds <= 20:
-            raise ValueError("Recording duration must be between 0 and 20 seconds")
+            raise ValueError(tr("Recording duration must be between 0 and 20 seconds"))
         with self._lock:
             if self._stats["state"] != "running":
-                raise RuntimeError("Start the audio route before recording")
+                raise RuntimeError(tr("Start the audio route before recording"))
             if self._recording:
-                raise RuntimeError("A recording is already in progress")
+                raise RuntimeError(tr("A recording is already in progress"))
             self.discard_recording()
             self._record_limit = max(1, int(max_seconds * RATE))
             # Skip the delayed history preceding the user's record action.
@@ -263,10 +265,10 @@ class AudioRoute:
             if status:
                 self._count("device_status")
             if frames != HOP:
-                raise RuntimeError(f"Input device returned {frames} frames; expected {HOP}")
+                raise RuntimeError(tr("Input device returned {frames} frames; expected {HOP}", frames=frames, HOP=HOP))
             block = np.asarray(data, dtype=np.float32).copy()
             if not np.isfinite(block).all():
-                raise RuntimeError("Input device returned non-finite samples")
+                raise RuntimeError(tr("Input device returned non-finite samples"))
             self._offer(self._incoming, block, "input_drop")
         except Exception as exc:
             self._failure(exc)
@@ -279,7 +281,7 @@ class AudioRoute:
             if status:
                 self._count("device_status")
             if frames != HOP:
-                raise RuntimeError(f"Output device requested {frames} frames; expected {HOP}")
+                raise RuntimeError(tr("Output device requested {frames} frames; expected {HOP}", frames=frames, HOP=HOP))
             try:
                 block = self._outgoing.get_nowait()
             except queue.Empty:
@@ -369,7 +371,7 @@ class AudioRoute:
                 return
             latency = sum(group[0].latency for group in stages)
             if latency % HOP:
-                raise RuntimeError("Model latency must be a multiple of the hop size")
+                raise RuntimeError(tr("Model latency must be a multiple of the hop size"))
             raw_delay = deque(
                 np.zeros((HOP, channels), np.float32)
                 for _ in range(latency // HOP)
@@ -396,7 +398,7 @@ class AudioRoute:
                         self._stats["state"] = "running"
                 while not self._stop.is_set():
                     if not source.active or not output.active:
-                        raise RuntimeError("An audio device stopped unexpectedly or disconnected")
+                        raise RuntimeError(tr("An audio device stopped unexpectedly or disconnected"))
                     with self._lock:
                         settings = self._effects
                     if settings != applied:
@@ -410,7 +412,7 @@ class AudioRoute:
                                     model.reset()
                             latency = sum(group[0].latency for group in stages)
                             if latency % HOP:
-                                raise RuntimeError("Model latency must be a multiple of the hop size")
+                                raise RuntimeError(tr("Model latency must be a multiple of the hop size"))
                             raw_delay = deque(
                                 np.zeros((HOP, channels), np.float32)
                                 for _ in range(latency // HOP)
@@ -437,7 +439,7 @@ class AudioRoute:
                             for channel, model in enumerate(group)
                         ])
                     if not np.isfinite(clean).all():
-                        raise RuntimeError("The audio model returned non-finite samples")
+                        raise RuntimeError(tr("The audio model returned non-finite samples"))
                     clean = np.clip(clean, -1, 1).astype(np.float32, copy=False)
                     elapsed = (time.perf_counter() - start) * 1000
                     raw_delay.append(block)

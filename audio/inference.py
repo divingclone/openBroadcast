@@ -1,6 +1,8 @@
 """Named GPU discovery using the same device order as each inference provider."""
 from __future__ import annotations
 
+from ..i18n import tr
+
 import ctypes as C
 from dataclasses import dataclass
 import os
@@ -28,7 +30,7 @@ class GpuDevice:
     @property
     def label(self):
         backend = "CUDA" if self.provider == CUDA else "DirectML"
-        return f"{self.name} · {backend}" + ("" if self.available else "（未安装支持）")
+        return f"{self.name} · {backend}" + ("" if self.available else tr('（未安装支持）'))
 
 
 def _cuda_devices():
@@ -131,8 +133,7 @@ def inference_options(config, devices=None):
     devices = discover_gpus() if devices is None else devices
     device = selected_gpu(config, devices)
     if device is None:
-        raise ValueError("所选显卡不可用或已变更，请到设置中重新选择推理显卡。")
+        raise ValueError(tr('所选显卡不可用或已变更，请到设置中重新选择推理显卡。'))
     if not device.available:
-        raise ValueError(f"{device.name} 尚未安装 GPU 推理支持。请切换到 CPU，"
-                         "或按照使用说明安装 GPU 运行库后重启程序。")
+        raise ValueError(tr('{value0} 尚未安装 GPU 推理支持。请切换到 CPU，或按照使用说明安装 GPU 运行库后重启程序。', value0=device.name))
     return dict(provider=device.provider, device_id=device.device_id, threads=config["threads"])

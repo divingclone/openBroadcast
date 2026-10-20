@@ -1,6 +1,8 @@
 """Windows notification-area icon; all GUI actions travel through a queue."""
 from __future__ import annotations
 
+from .i18n import tr
+
 import threading
 
 
@@ -18,11 +20,11 @@ class TrayIcon:
         for x, height in ((5, 8), (10, 18), (15, 26), (20, 14), (25, 8)):
             draw.rectangle((x, 16-height//2, x+2, 16+height//2), fill="#76b900")
         self.icon = pystray.Icon(
-            "OpenBroadcast", image, "OpenBroadcast · 音频处理",
+            "OpenBroadcast", image, tr('OpenBroadcast · 音频处理'),
             menu=pystray.Menu(
-                pystray.MenuItem("打开 OpenBroadcast", self._show, default=True),
+                pystray.MenuItem(tr('打开 OpenBroadcast'), self._show, default=True),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("退出 OpenBroadcast", self._exit),
+                pystray.MenuItem(tr('退出 OpenBroadcast'), self._exit),
             ),
         )
 
@@ -49,7 +51,7 @@ class TrayIcon:
         try:
             self.icon.run(setup=self._setup)
             if not self.stopping.is_set():
-                self.events.put(("tray_error", "系统托盘已停止。"))
+                self.events.put(("tray_error", tr('系统托盘已停止。')))
         except Exception as exc:
             if not self.stopping.is_set():
                 self.events.put(("tray_error", str(exc)))

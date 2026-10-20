@@ -8,6 +8,8 @@ if len(sys.argv) == 3 and sys.argv[1] == "--check-runtime":
     from openbroadcast.runtime_check import run
     raise SystemExit(run(sys.argv[2]))
 
+from openbroadcast.i18n import tr
+
 try:
     from openbroadcast.gui import main
     main()
@@ -18,8 +20,7 @@ except Exception as exc:
     root.withdraw()
     messagebox.showerror(
         "OpenBroadcast",
-        f"启动失败：{exc}\n\n请使用安装了 requirements.txt 的 Python。\n"
-        "推荐：.venv\\Scripts\\pythonw.exe run_gui.pyw",
+        tr('启动失败：{exc}\n\n请使用安装了 requirements.txt 的 Python。\n推荐：.venv\\Scripts\\pythonw.exe run_gui.pyw', exc=exc),
     )
     root.destroy()
     raise
