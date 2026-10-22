@@ -16,6 +16,7 @@ def run(report_path):
         import soundfile as sf
         import tkinter as tk
         from .audio.denoiser import Denoiser, RATE
+        from .audio.studio import StudioVoice
         from .audio.inference import discover_gpus
         from .audio.runtime import list_devices
         from .gui import App
@@ -33,15 +34,23 @@ def run(report_path):
         choices = [("cpu", 0, "CPU")]
         choices += [(gpu.provider, gpu.device_id, gpu.name) for gpu in discover_gpus() if gpu.available]
         for provider, device, name in choices:
-            for model in ("denoiser_48k.onnx", "dereverb_48k.onnx"):
-                engine = Denoiser(provider=provider, device_id=device, model_file=model)
+            for model in ("denoiser_48k.onnx", "dereverb_48k.onnx", "studio_voice_48k.onnx"):
+                engine = (StudioVoice(provider=provider, device_id=device)
+                          if model == "studio_voice_48k.onnx" else
+                          Denoiser(provider=provider, device_id=device, model_file=model))
                 output = engine.process_audio(samples)
                 assert output.shape == samples.shape and np.isfinite(output).all()
-                report["inference"].append({
+                result = {
                     "device": name, "provider": provider, "model": model,
                     "active_providers": engine.session.get_providers(),
                     "sha256": hashlib.sha256(output.tobytes()).hexdigest(),
-                })
+                }
+                if isinstance(engine, StudioVoice):
+                    result["native_dml"] = engine.native_session is not None
+                    result["native_dml_error"] = engine.native_error
+                    if engine.native_session is not None:
+                        result["native_adapter"] = engine.native_session.adapter_name
+                report["inference"].append(result)
                 del engine
         with tempfile.TemporaryDirectory(prefix="OpenBroadcast-check-") as temporary:
             folder = Path(temporary)

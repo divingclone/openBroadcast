@@ -15,6 +15,7 @@ _CHANNEL_DEFAULTS = {
     "enabled": False,
     "noise": True,
     "dereverb": False,
+    "studio": False,
     "noise_strength": 1.0,
     "dereverb_strength": 1.0,
     "input": None,
@@ -55,9 +56,14 @@ def validate_settings(values: object) -> dict:
         incoming = values.get(channel)
         if not isinstance(incoming, dict):
             continue
-        for key in ("enabled", "noise", "dereverb"):
+        for key in ("enabled", "noise", "dereverb", "studio"):
             if type(incoming.get(key)) is bool:
                 result[channel][key] = incoming[key]
+        if channel == "speaker":
+            result[channel]["studio"] = False
+        if result[channel]["studio"]:
+            result[channel]["noise"] = False
+            result[channel]["dereverb"] = False
         for key in ("noise_strength", "dereverb_strength"):
             value = incoming.get(key)
             if type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 1:

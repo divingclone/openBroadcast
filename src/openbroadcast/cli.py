@@ -36,6 +36,11 @@ def _inference_options(args: argparse.Namespace):
 
 def _make_engine(args: argparse.Namespace, dereverb: bool = False):
     options = _inference_options(args)
+    if getattr(args, "studio", False):
+        if dereverb:
+            raise ValueError("--studio cannot be combined with --dereverb")
+        from .audio.studio import StudioVoice
+        return StudioVoice(**options)
     stages = []
     if dereverb:
         stages.append(
@@ -59,6 +64,7 @@ def cmd_info(_: argparse.Namespace) -> int:
 
     model = ROOT / "audio" / "models" / "denoiser_48k.onnx"
     dereverb = ROOT / "audio" / "models" / "dereverb_48k.onnx"
+    studio = ROOT / "audio" / "models" / "studio_voice_48k.onnx"
     info = {
         "version": __version__,
         "onnxruntime": ort.__version__,
@@ -69,6 +75,11 @@ def cmd_info(_: argparse.Namespace) -> int:
         "dereverb_model": str(dereverb),
         "dereverb_model_sha256": _sha256(dereverb),
         "dereverb_model_mb": round(dereverb.stat().st_size / 1e6, 1),
+        "studio_model": str(studio),
+        "studio_model_sha256": _sha256(studio),
+        "studio_model_mb": round(studio.stat().st_size / 1e6, 1),
+        "studio_inference_samples": 3840,
+        "studio_buffering_latency_samples": 3360,
         "sample_rate": RATE,
         "block": HOP,
         "algorithmic_latency_samples": LATENCY,
@@ -96,6 +107,7 @@ def cmd_denoise(args: argparse.Namespace) -> int:
                 "processing_seconds": round(elapsed, 3),
                 "realtime_factor": round(elapsed / (audio.size / RATE), 4) if audio.size else None,
                 "dereverb": bool(args.dereverb),
+                "studio": bool(args.studio),
                 "stages": 2 if args.dereverb else 1,
                 "providers": engine.session.get_providers(),
             },
@@ -134,7 +146,7 @@ def cmd_mic(args: argparse.Namespace) -> int:
     route = AudioRoute("microphone", sd_module=sd)
     route.start(
         args.input_device, args.output_device, channels=1,
-        effects=EffectSettings(noise=True, dereverb=args.dereverb,
+        effects=EffectSettings(noise=not args.studio, dereverb=args.dereverb, studio=args.studio,
                                noise_strength=args.intensity, dereverb_strength=args.intensity),
         **_inference_options(args),
     )
@@ -145,7 +157,8 @@ def cmd_mic(args: argparse.Namespace) -> int:
             if state["state"] == "error":
                 raise RuntimeError(state["error"])
             if state["state"] == "running" and not announced:
-                print(f"Noise removal running. Model delay {state['latency_ms']:.0f} ms "
+                effect = "Studio Voice" if args.studio else "Noise removal"
+                print(f"{effect} running. Model delay {state['latency_ms']:.0f} ms "
                       "+ device buffers. Ctrl+C to stop.")
                 announced = True
             if not route.busy:
@@ -168,7 +181,11 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
         raise SystemExit("--seconds must be a finite positive number")
     rng = np.random.default_rng(0)
     audio = rng.normal(0, 0.03, int(RATE * seconds)).astype(np.float32)
-    engine = Denoiser(**_inference_options(args))
+    if getattr(args, "studio", False):
+        from .audio.studio import StudioVoice
+        engine = StudioVoice(**_inference_options(args))
+    else:
+        engine = Denoiser(**_inference_options(args))
     t0 = time.perf_counter()
     engine.process_audio(audio)
     elapsed = time.perf_counter() - t0
@@ -195,7 +212,8 @@ def cmd_gui(_: argparse.Namespace) -> int:
 def cmd_process(args: argparse.Namespace) -> int:
     from .audio.files import process_file
     result = process_file(
-        args.input, args.output, noise=not args.no_noise, dereverb=args.dereverb,
+        args.input, args.output, noise=not (args.no_noise or args.studio),
+        dereverb=args.dereverb, studio=args.studio,
         noise_strength=args.noise_strength, dereverb_strength=args.dereverb_strength,
         **_inference_options(args),
     )
@@ -206,7 +224,7 @@ def cmd_process(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="openbroadcast",
-        description="Portable NVIDIA Broadcast audio effects: noise removal and room echo removal.",
+        description="Portable NVIDIA Broadcast audio effects: noise removal, room echo removal and Studio Voice.",
     )
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = p.add_subparsers(dest="command")
@@ -222,6 +240,12 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--device-id", type=int, help="native device index; requires an explicit --provider")
         sp.add_argument("--threads", type=int, default=2)
 
+    def effects(sp):
+        group = sp.add_mutually_exclusive_group()
+        group.add_argument("--dereverb", action="store_true", help="remove room reverb before noise removal")
+        group.add_argument("--studio", action="store_true",
+                           help="use Studio Voice instead of noise/echo removal; intensity does not apply")
+
     info = sub.add_parser("info", help="show model hashes and available providers")
     info.set_defaults(func=cmd_info)
 
@@ -229,7 +253,7 @@ def build_parser() -> argparse.ArgumentParser:
     dn.add_argument("input")
     dn.add_argument("output")
     dn.add_argument("--intensity", type=float, default=1.0)
-    dn.add_argument("--dereverb", action="store_true", help="remove room reverb before noise removal")
+    effects(dn)
     common(dn)
     dn.set_defaults(func=cmd_denoise)
 
@@ -237,7 +261,7 @@ def build_parser() -> argparse.ArgumentParser:
     files.add_argument("input")
     files.add_argument("output")
     files.add_argument("--no-noise", action="store_true")
-    files.add_argument("--dereverb", action="store_true")
+    effects(files)
     files.add_argument("--noise-strength", type=float, default=1.0)
     files.add_argument("--dereverb-strength", type=float, default=1.0)
     common(files)
@@ -251,12 +275,13 @@ def build_parser() -> argparse.ArgumentParser:
     mic.add_argument("--input-device", type=int)
     mic.add_argument("--output-device", type=int)
     mic.add_argument("--intensity", type=float, default=1.0)
-    mic.add_argument("--dereverb", action="store_true", help="remove room reverb before noise removal")
+    effects(mic)
     common(mic)
     mic.set_defaults(func=cmd_mic)
 
     bench = sub.add_parser("benchmark", help="measure audio real-time factor")
     bench.add_argument("--seconds", type=float, default=10.0)
+    bench.add_argument("--studio", action="store_true", help="benchmark Studio Voice")
     common(bench)
     bench.set_defaults(func=cmd_benchmark)
 

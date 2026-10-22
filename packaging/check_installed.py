@@ -15,6 +15,7 @@ import tkinter
 import openbroadcast
 from openbroadcast.audio.denoiser import Denoiser, RATE
 from openbroadcast.audio.files import process_file
+from openbroadcast.audio.studio import StudioVoice
 
 
 def main():
@@ -31,8 +32,9 @@ def main():
         assert (package / name).is_file(), f"Missing installed resource: {name}"
 
     signal = (0.03 * np.sin(np.arange(4800) * (2 * np.pi * 437 / RATE))).astype("float32")
-    for model in ("denoiser_48k.onnx", "dereverb_48k.onnx"):
-        engine = Denoiser(model_file=model, provider="cpu")
+    for model in ("denoiser_48k.onnx", "dereverb_48k.onnx", "studio_voice_48k.onnx"):
+        engine = (StudioVoice(provider="cpu") if model == "studio_voice_48k.onnx"
+                  else Denoiser(model_file=model, provider="cpu"))
         output = engine.process_audio(signal)
         assert output.shape == signal.shape and np.isfinite(output).all(), model
         del engine

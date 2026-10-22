@@ -175,6 +175,7 @@ class App:
             self.vars[key] = {
                 "noise": tk.BooleanVar(value=cfg["noise"]),
                 "dereverb": tk.BooleanVar(value=cfg["dereverb"]),
+                "studio": tk.BooleanVar(value=cfg["studio"]),
                 "noise_strength": tk.DoubleVar(value=cfg["noise_strength"]),
                 "dereverb_strength": tk.DoubleVar(value=cfg["dereverb_strength"]),
             }
@@ -484,13 +485,15 @@ class App:
         if key == "mic":
             row = self.frame(parent)
             row.pack(fill="x", pady=(8, 4))
-            self.label(row, tr('›  音棚音效'), font=(FONT, -14, "bold"), muted=True).pack(side="left")
-            Switch(row, self, tk.BooleanVar(value=False), disabled=True).pack(side="right")
+            self.label(row, tr('音棚音效'), font=(FONT, -14, "bold")).pack(side="left")
+            Switch(row, self, self.vars[key]["studio"],
+                   lambda: self.effects_changed(key)).pack(side="right")
             self.label(parent, tr('提升音质，模拟高端录音室效果'), muted=True,
                        font=(FONT, -12)).pack(anchor="w", padx=16, pady=3)
-            self.label(parent, tr('尚未移植 · 当前项目未包含音棚音效模型'), muted=True,
-                       font=(FONT, -12)).pack(anchor="w", padx=16, pady=(6, 2))
-            self.line(parent)
+            self.label(parent, tr('不推荐与游戏或 GPU 密集型应用程序一起使用。'), muted=True,
+                       font=(FONT, -12, "bold")).pack(anchor="w", padx=16, pady=(12, 2))
+        self.line(parent)
+        self.sync_effect_controls(key)
         routing = self.disclosure(parent, tr('音频路由'), state_key=f"{key}:routing")
         self.ui[key]["routing"] = routing
         self.label(routing, tr('发送到（虚拟声卡 / 监听设备）') if key == "mic" else tr('接收来自（虚拟声卡录音端）'),
@@ -528,7 +531,9 @@ class App:
         heading = self.button(row, ("⌄  " if expanded.get() else "›  ")+title, expand, font=(FONT, -14, "bold"),
                               bg=self.c["bg"], padx=0, anchor="w", highlightthickness=0)
         heading.pack(side="left", fill="x", expand=True)
-        Switch(row, self, self.vars[key][effect], lambda: self.effects_changed(key)).pack(side="right")
+        switch = Switch(row, self, self.vars[key][effect], lambda: self.effects_changed(key))
+        switch.pack(side="right")
+        self.ui[key][effect+"_switch"] = switch
         self.label(box, description, muted=True, font=(FONT, -12)).pack(anchor="w", padx=16, pady=(0, 4))
         self.label(details, tr('强度'), muted=True, font=(FONT, -12)).pack(side="left")
         percent = self.label(details, f"{self.vars[key][effect+'_strength'].get():.0%}", muted=True,
@@ -697,11 +702,27 @@ class App:
             self.reconfigure_route(key)
 
     def effects(self, key):
-        return EffectSettings(**{name: var.get() for name, var in self.vars[key].items()})
+        values = {name: var.get() for name, var in self.vars[key].items()}
+        values["studio"] = key == "mic" and values["studio"]
+        return EffectSettings(**values)
+
+    def sync_effect_controls(self, key):
+        if key != "mic":
+            self.vars[key]["studio"].set(False)
+        studio = self.vars[key]["studio"].get()
+        for effect in ("noise", "dereverb"):
+            if studio:
+                self.vars[key][effect].set(False)
+            switch = self.ui[key].get(effect+"_switch")
+            if switch is not None:
+                switch.disabled = studio
+                switch.configure(takefocus=not studio, cursor="arrow" if studio else "hand2")
+                switch.draw()
 
     def effects_changed(self, key):
         if self.closing:
             return
+        self.sync_effect_controls(key)
         self.config[key].update({name: var.get() for name, var in self.vars[key].items()})
         self.routes[key].update_effects(self.effects(key))
         self.schedule_save()
@@ -1073,7 +1094,7 @@ class App:
         self.line(box)
         self.label(box, tr('音频连接'), font=(FONT, -16, "bold")).pack(anchor="w")
         help_text = (
-            tr('麦克风：真实麦克风 → OpenBroadcast → 虚拟声卡播放端 → 通话软件。\n扬声器：通话软件 → 另一条虚拟声卡 → OpenBroadcast → 耳机。\n\n两路同时使用时，请用不同的虚拟声卡，避免循环。程序不安装虚拟驱动。\n音棚音效模型尚未移植，界面中已禁用该项。降噪与去混响可独立使用。\n\n快捷键：Ctrl+1 音频 · Ctrl+2 文件 · Ctrl+3 设置 · Esc 停止试听。\n设备与强度自动保存；启动程序时自动恢复上次启用的音频路由。')
+            tr('麦克风：真实麦克风 → OpenBroadcast → 虚拟声卡播放端 → 通话软件。\n扬声器：通话软件 → 另一条虚拟声卡 → OpenBroadcast → 耳机。\n\n两路同时使用时，请用不同的虚拟声卡，避免循环。程序不安装虚拟驱动。\n音棚音效仅用于麦克风，开启后替代降噪与去混响，关闭后可重新选择其他效果。\n\n快捷键：Ctrl+1 音频 · Ctrl+2 文件 · Ctrl+3 设置 · Esc 停止试听。\n设备与强度自动保存；启动程序时自动恢复上次启用的音频路由。')
         )
         self.label(box, help_text, muted=True, wraplength=750, justify="left").pack(anchor="w", pady=14)
         self.button(box, tr('打开使用说明'), self.show_readme).pack(anchor="w", pady=8)
@@ -1237,7 +1258,8 @@ class App:
                     not (self.file_thread and self.file_thread.is_alive())):
                 self.file_restart = False
                 self.process_file(restart=True)
-        total_ms, active = 0, []
+        max_factor, active, warnings = 0, [], []
+        all_ready = True
         for key, route in self.routes.items():
             snap = route.snapshot()
             state = snap["state"]
@@ -1258,11 +1280,25 @@ class App:
                 text = tr('无法恢复音频：')+self.route_errors[key]
             if state == "running":
                 active.append(tr('麦克风') if key == "mic" else tr('扬声器'))
-                total_ms += snap["process_ms"]
+                all_ready = all_ready and snap["performance_ready"]
+                max_factor = max(max_factor, snap["realtime_factor"])
                 text = tr('运行中 · {value0} 声道 · 模型延迟 {value1:.0f} ms + 缓冲', value0=snap['channels'], value1=snap['latency_ms'])
                 if self.config["show_performance"]:
-                    text += tr('\n处理 {value0:.1f} ms / 10 ms · 丢帧 {value1} · 欠载 {value2}', value0=snap['process_ms'], value1=snap['input_drop'] + snap['output_drop'], value2=snap['output_underrun'])
-            ui["state"].configure(text=text or state)
+                    if snap["performance_ready"]:
+                        text += tr('\n平均 {value0:.1f} ms / 10 ms · 丢帧 {value1} · 欠载 {value2}', value0=snap['process_ms'], value1=snap['input_drop'] + snap['output_drop'], value2=snap['output_underrun'])
+                    else:
+                        text += tr('\n正在统计平均处理速度…')
+                if snap["performance_warning"]:
+                    warnings.append(tr('麦克风') if key == "mic" else tr('扬声器'))
+                    text += (tr('\n性能不足：处理速度跟不上实时音频。')
+                             if snap["performance_warning"] == "processing" else
+                             tr('\n实时音频不稳定：持续丢帧或欠载。'))
+                    text += (tr('\n请切换更快的推理设备，或减少同时运行的效果。')
+                             if snap["performance_warning"] == "processing" else
+                             tr('\n请检查音频设备与缓冲，或减少同时运行的效果。'))
+            warning = state == "running" and bool(snap["performance_warning"])
+            warning_color = "#ff8b70" if self.config["theme"] == "dark" else "#b33224"
+            ui["state"].configure(text=text or state, fg=warning_color if warning else self.c["muted"])
             ui["record"].configure(icon="stop" if snap["recording"] else "record",
                                     state="normal" if state == "running" else "disabled")
             ui["record_time"].configure(text=f"00:{int(snap['recorded_seconds']):02d} / 00:20")
@@ -1284,15 +1320,17 @@ class App:
         elif not self.player.error:
             if self.player.active:
                 self.status.set(tr('试听 {value0:.1f} / {value1:.1f} 秒 · Esc 停止', value0=self.player.position / RATE, value1=self.player.total / RATE))
+            elif warnings:
+                self.status.set(tr('实时性能警告：{routes}', routes=" + ".join(warnings)))
             elif active:
-                self.status.set(" + ".join(active)+tr('运行中')+(tr(' · 每 10 ms 处理耗时 {total_ms:.1f} ms', total_ms=total_ms) if self.config["show_performance"] else ""))
+                self.status.set(" + ".join(active)+tr('运行中')+(tr(' · 最慢一路平均 {value:.1f} ms / 10 ms', value=max_factor * 10) if self.config["show_performance"] and all_ready else ""))
             else:
                 self.status.set(tr('就绪 · 仅音频 · 视频功能尚未实现'))
         file_busy = bool(self.file_thread and self.file_thread.is_alive()) or self.file_restart
         self.file_start.configure(state="disabled" if file_busy or self.closing else "normal")
         self.file_stop.configure(state="normal" if file_busy else "disabled")
         e = self.effects("mic")
-        self.file_effect_label.configure(text=tr('当前效果：噪音消除 {value0} ({value1:.0%})  ·  房间回声消除 {value2} ({value3:.0%})', value0=tr('开启') if e.noise else tr('关闭'), value1=e.noise_strength, value2=tr('开启') if e.dereverb else tr('关闭'), value3=e.dereverb_strength))
+        self.file_effect_label.configure(text=tr('当前效果：音棚音效') if e.studio else tr('当前效果：噪音消除 {value0} ({value1:.0%})  ·  房间回声消除 {value2} ({value3:.0%})', value0=tr('开启') if e.noise else tr('关闭'), value1=e.noise_strength, value2=tr('开启') if e.dereverb else tr('关闭'), value3=e.dereverb_strength))
         if self.closing:
             busy = file_busy or self.player.busy or self.sample_job or any(
                 r.busy for r in self.routes.values())

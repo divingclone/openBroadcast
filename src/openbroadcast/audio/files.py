@@ -20,6 +20,8 @@ import time
 import numpy as np
 import soundfile as sf
 
+from .studio import StudioVoice, LATENCY as STUDIO_LATENCY
+
 from .denoiser import Denoiser, HOP, LATENCY, RATE
 
 
@@ -72,6 +74,7 @@ def process_file(
     device_id=0,
     progress=None,
     cancel=None,
+    studio=False,
 ) -> dict:
     """Process a file atomically and return metadata.
 
@@ -107,8 +110,8 @@ def process_file(
                 raise ValueError(tr("Empty audio cannot be encoded as FLAC; choose WAV output"))
             stages = []
             for enabled, model, strength in (
-                (dereverb, "dereverb_48k.onnx", dereverb_strength),
-                (noise, "denoiser_48k.onnx", noise_strength),
+                (dereverb and not studio, "dereverb_48k.onnx", dereverb_strength),
+                (noise and not studio, "denoiser_48k.onnx", noise_strength),
             ):
                 if enabled:
                     per_channel = []
@@ -119,7 +122,13 @@ def process_file(
                             threads=threads, device_id=device_id,
                         ))
                     stages.append(per_channel)
-            latency = LATENCY * len(stages)
+            if studio:
+                per_channel = []
+                for _ in range(source.channels):
+                    _check_cancel(cancel)
+                    per_channel.append(StudioVoice(provider=provider, threads=threads, device_id=device_id))
+                stages.append(per_channel)
+            latency = STUDIO_LATENCY if studio else LATENCY * len(stages)
             total = ((frames + latency + HOP - 1) // HOP) * HOP if frames else 0
             fd, temporary = tempfile.mkstemp(prefix=f".{dst.stem}-", suffix=dst.suffix,
                                               dir=dst.parent)
@@ -161,7 +170,8 @@ def process_file(
                 "input_sample_rate": source.samplerate, "sample_rate": RATE,
                 "channels": source.channels, "input_frames": source.frames,
                 "frames": written, "audio_seconds": written / RATE,
-                "noise": bool(noise), "dereverb": bool(dereverb),
+                "noise": bool(noise and not studio), "dereverb": bool(dereverb and not studio),
+                "studio": bool(studio),
                 "noise_strength": noise_strength, "dereverb_strength": dereverb_strength,
                 "stages": len(stages), "latency_samples": latency,
                 "resampling": "none" if source.samplerate == RATE else "linear",

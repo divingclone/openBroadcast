@@ -3,6 +3,7 @@ include README.md README.zh-CN.md setup.py run_gui.pyw
 recursive-include src/openbroadcast *.pyw
 recursive-include src/openbroadcast/audio/models *.onnx
 recursive-include src/openbroadcast/audio/data *.npz
+recursive-include src/openbroadcast/audio/native *.dll *.cpp
 recursive-include tests *.py
 recursive-include docs *.md
 recursive-include packaging *.py *.ps1 *.spec

@@ -3,7 +3,7 @@
 [English](https://github.com/divingclone/openBroadcast/blob/main/README.md) | 简体中文
 
 面向 Windows、macOS 和 Linux 的 NVIDIA Broadcast 独立移植项目，提供麦克风与扬声器降噪、房间回声消除及音频文件处理。
-不包含视频、音棚音效或虚拟声卡驱动。macOS 和 Linux 的真实音频硬件验证仍在进行中。
+不包含视频或虚拟声卡驱动。macOS 和 Linux 的真实音频硬件验证仍在进行中。
 
 ## 安装
 
@@ -12,7 +12,7 @@
 **uv（三系统通用）**：安装 [uv](https://docs.astral.sh/uv/getting-started/installation/)，然后安装并启动：
 
 ```sh
-uv tool install --python 3.12 "https://github.com/divingclone/openBroadcast/releases/download/v0.2.3/openbroadcast-0.2.3-py3-none-any.whl"
+uv tool install --python 3.12 "https://github.com/divingclone/openBroadcast/releases/download/v0.2.4/openbroadcast-0.2.4-py3-none-any.whl"
 openbroadcast-gui
 ```
 
@@ -21,7 +21,7 @@ uv 自动管理 Python 和运行环境。以后直接运行 `openbroadcast-gui`�
 也可使用普通 pip 安装，需要 64 位 Python 3.11+（含 Tkinter，推荐 3.12）：
 
 ```sh
-python -m pip install "https://github.com/divingclone/openBroadcast/releases/download/v0.2.3/openbroadcast-0.2.3-py3-none-any.whl"
+python -m pip install "https://github.com/divingclone/openBroadcast/releases/download/v0.2.4/openbroadcast-0.2.4-py3-none-any.whl"
 ```
 
 安装包已包含音频模型。macOS 需为启动程序的应用授予麦克风权限；Linux 需要图形桌面及[系统依赖](https://github.com/divingclone/openBroadcast/blob/main/docs/compatibility.md#安装与构建)。

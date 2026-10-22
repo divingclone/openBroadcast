@@ -8,7 +8,8 @@ datas = [(str(root / src), dst) for src, dst in [
     ('README.md', 'openbroadcast'),
     ('README.zh-CN.md', 'openbroadcast'),
 ]]
-binaries = []
+binaries = [(str(root / 'src/openbroadcast/audio/native/explicit_dml.dll'),
+             'openbroadcast/audio/native')]
 hiddenimports = ['pystray._win32']
 
 

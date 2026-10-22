@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "openbroadcast"
 dynamic = ["version", "dependencies"]
-description = "Real-time microphone and speaker noise reduction and room echo removal"
+description = "Microphone and speaker noise reduction, room echo removal and Studio Voice"
 readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
@@ -37,7 +37,7 @@ namespaces = false
 
 [tool.setuptools.package-data]
 openbroadcast = ["run_gui.pyw"]
-"openbroadcast.audio" = ["models/*.onnx", "data/*.npz"]
+"openbroadcast.audio" = ["models/*.onnx", "data/*.npz", "native/*.dll", "native/*.cpp"]
 
 [tool.setuptools.dynamic]
 version = {attr = "openbroadcast.__version__"}

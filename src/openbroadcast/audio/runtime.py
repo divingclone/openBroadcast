@@ -22,6 +22,8 @@ import numpy as np
 
 from .denoiser import Denoiser, HOP, RATE
 from .com import audio_thread
+from .studio import StudioVoice
+from .performance import PerformanceMonitor
 
 
 @dataclass(frozen=True)
@@ -106,6 +108,7 @@ class EffectSettings:
     dereverb: bool = False
     noise_strength: float = 1.0
     dereverb_strength: float = 1.0
+    studio: bool = False
 
     def __post_init__(self):
         for name in ("noise_strength", "dereverb_strength"):
@@ -114,8 +117,8 @@ class EffectSettings:
                 raise ValueError(f"{name} must be between 0 and 1")
 
     @property
-    def topology(self) -> tuple[bool, bool]:
-        return self.noise, self.dereverb
+    def topology(self) -> tuple[bool, bool, bool]:
+        return self.noise and not self.studio, self.dereverb and not self.studio, self.studio
 
 
 class AudioRoute:
@@ -130,10 +133,12 @@ class AudioRoute:
     def __init__(
         self, name: str = "microphone", sd_module=None,
         engine_factory: Callable[..., Any] | None = None,
+        studio_factory: Callable[..., Any] | None = None,
     ):
         self.name = name
         self._sd = sd_module
         self._factory = engine_factory or Denoiser
+        self._studio_factory = studio_factory or StudioVoice
         self._lock = threading.RLock()
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -141,6 +146,7 @@ class AudioRoute:
         self._incoming: queue.Queue = queue.Queue(8)
         self._outgoing: queue.Queue = queue.Queue(8)
         self._stats = self._initial_stats()
+        self._performance = None
         self._recording = False
         self._record_raw: list[np.ndarray] = []
         self._record_clean: list[np.ndarray] = []
@@ -155,11 +161,14 @@ class AudioRoute:
             state="idle", error="", input_peak=0.0, output_peak=0.0,
             input_drop=0, output_drop=0, output_underrun=0, device_status=0,
             process_ms=0.0, latency_ms=0.0, channels=1,
+            realtime_factor=0.0, performance_ready=False, performance_warning="",
         )
 
     def snapshot(self) -> dict:
         with self._lock:
             result = self._stats.copy()
+            if self._performance is not None and result["state"] == "running":
+                result.update(self._performance.snapshot(time.monotonic()))
             result.update(
                 recording=self._recording,
                 recorded_seconds=self._record_count / RATE,
@@ -187,6 +196,7 @@ class AudioRoute:
                 raise RuntimeError(tr("The route is still running or stopping"))
             self._effects = effects or self._effects
             self._stats = self._initial_stats()
+            self._performance = None
             self._stats.update(state="loading", channels=channels)
             self._incoming = queue.Queue(8)
             self._outgoing = queue.Queue(8)
@@ -257,6 +267,8 @@ class AudioRoute:
     def _count(self, key: str) -> None:
         with self._lock:
             self._stats[key] += 1
+            if self._performance is not None and key in ("input_drop", "output_drop", "output_underrun"):
+                self._performance.glitch(time.monotonic())
 
     def _input_callback(self, data, frames, _time, status) -> None:
         if self._stop.is_set():
@@ -264,6 +276,8 @@ class AudioRoute:
         try:
             if status:
                 self._count("device_status")
+                if getattr(status, "input_overflow", False):
+                    self._count("input_drop")
             if frames != HOP:
                 raise RuntimeError(tr("Input device returned {frames} frames; expected {HOP}", frames=frames, HOP=HOP))
             block = np.asarray(data, dtype=np.float32).copy()
@@ -280,6 +294,8 @@ class AudioRoute:
         try:
             if status:
                 self._count("device_status")
+                if getattr(status, "output_underflow", False):
+                    self._count("output_underrun")
             if frames != HOP:
                 raise RuntimeError(tr("Output device requested {frames} frames; expected {HOP}", frames=frames, HOP=HOP))
             try:
@@ -345,6 +361,10 @@ class AudioRoute:
                                      dtype="float32", samplerate=RATE)
 
             def prepare(settings: EffectSettings) -> list[list]:
+                if settings.studio:
+                    if "studio" not in models:
+                        models["studio"] = [self._studio_factory(**options) for _ in range(channels)]
+                    return [models["studio"]]
                 stages = []
                 for enabled, key, strength, filename in (
                     (settings.dereverb, "dereverb", settings.dereverb_strength,
@@ -395,6 +415,7 @@ class AudioRoute:
                 source.start()
                 with self._lock:
                     if not self._stop.is_set():
+                        self._performance = PerformanceMonitor(time.monotonic())
                         self._stats["state"] = "running"
                 while not self._stop.is_set():
                     if not source.active or not output.active:
@@ -403,6 +424,9 @@ class AudioRoute:
                         settings = self._effects
                     if settings != applied:
                         changed = applied is None or settings.topology != applied.topology
+                        if changed:
+                            with self._lock:
+                                self._performance = None
                         stages = prepare(settings)
                         if self._stop.is_set():
                             break
@@ -426,6 +450,7 @@ class AudioRoute:
                                         self._record_error = "Effects changed during recording; record again."
                             with self._lock:
                                 self._stats["latency_ms"] = latency / RATE * 1000
+                                self._performance = PerformanceMonitor(time.monotonic())
                         applied = settings
                     try:
                         block = self._incoming.get(timeout=0.05)
@@ -446,8 +471,9 @@ class AudioRoute:
                     aligned_raw = raw_delay.popleft()
                     self._record(aligned_raw, clean)
                     with self._lock:
+                        if self._performance is not None:
+                            self._performance.processed(time.monotonic(), elapsed)
                         self._stats.update(
-                            process_ms=elapsed,
                             input_peak=float(np.max(np.abs(block))),
                             output_peak=float(np.max(np.abs(clean))),
                         )
@@ -459,6 +485,7 @@ class AudioRoute:
             self._drain(self._incoming)
             self._drain(self._outgoing)
             with self._lock:
+                self._performance = None
                 self._recording = False
                 self._stats.update(input_peak=0.0, output_peak=0.0)
                 if self._stats["state"] != "error":

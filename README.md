@@ -3,7 +3,7 @@
 English | [简体中文](https://github.com/divingclone/openBroadcast/blob/main/README.zh-CN.md)
 
 An independent port of NVIDIA Broadcast for Windows, macOS and Linux, providing microphone and speaker noise reduction, room echo removal, and audio file processing.
-Video, Studio Voice and virtual audio drivers are not included. macOS and Linux audio hardware validation is still in progress.
+Video and virtual audio drivers are not included. macOS and Linux audio hardware validation is still in progress.
 
 ## Installation
 
@@ -12,7 +12,7 @@ Video, Studio Voice and virtual audio drivers are not included. macOS and Linux 
 **uv (all platforms)**: Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then install and launch:
 
 ```sh
-uv tool install --python 3.12 "https://github.com/divingclone/openBroadcast/releases/download/v0.2.3/openbroadcast-0.2.3-py3-none-any.whl"
+uv tool install --python 3.12 "https://github.com/divingclone/openBroadcast/releases/download/v0.2.4/openbroadcast-0.2.4-py3-none-any.whl"
 openbroadcast-gui
 ```
 
@@ -21,7 +21,7 @@ uv manages Python and the environment automatically. For later launches, run `op
 You can also use regular pip with 64-bit Python 3.11+ and Tkinter (3.12 recommended):
 
 ```sh
-python -m pip install "https://github.com/divingclone/openBroadcast/releases/download/v0.2.3/openbroadcast-0.2.3-py3-none-any.whl"
+python -m pip install "https://github.com/divingclone/openBroadcast/releases/download/v0.2.4/openbroadcast-0.2.4-py3-none-any.whl"
 ```
 
 Audio models are included. On macOS, grant microphone permission to the launching app. On Linux, a graphical desktop and [system dependencies](https://github.com/divingclone/openBroadcast/blob/main/docs/compatibility.md#安装与构建) are required.

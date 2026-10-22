@@ -147,34 +147,7 @@ class Denoiser:
         threads: int,
         providers: Iterable[str] | None,
     ) -> ort.InferenceSession:
-        available = ort.get_available_providers()
-        if providers is None:
-            requested = [_PROVIDER_ALIASES.get(provider.lower(), provider)]
-        else:
-            requested = [str(p) for p in providers]
-        chosen = [p for p in requested if p in available]
-        unknown = [p for p in requested if p not in available]
-        if not chosen:
-            raise RuntimeError(
-                f"Requested provider(s) {unknown or requested} are unavailable. "
-                f"Installed providers: {available}"
-            )
-        options = ort.SessionOptions()
-        options.intra_op_num_threads = int(threads)
-        options.enable_mem_pattern = "DmlExecutionProvider" not in chosen
-        options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-        provider_list = []
-        for name in chosen:
-            name, opts = self._provider_options(name, device_id)
-            provider_list.append((name, opts))
-        if "CPUExecutionProvider" not in chosen:
-            provider_list.append("CPUExecutionProvider")
-        session = ort.InferenceSession(
-            str(self.model_path), sess_options=options, providers=provider_list
-        )
-        if not any(p in session.get_providers() for p in chosen):
-            raise RuntimeError(tr('所选推理后端初始化失败，请检查 GPU 运行库及驱动，或在设置中切换到 CPU。'))
-        return session
+        return create_session(self.model_path, provider, device_id, threads, providers)
 
     def set_intensity(self, intensity: float) -> None:
         if not 0.0 <= float(intensity) <= 1.0:
@@ -190,8 +163,22 @@ class Denoiser:
         self.audio_history = np.zeros(FFT - HOP, np.float32)
         self.feature_history = np.zeros((6, MEL_BINS), np.float32)
         self.overlap = np.zeros(FFT - HOP, np.float32)
-        self.pending: list[np.ndarray] = []
+        self._input_block = np.empty(BLOCK, np.float32)
+        self._input_count = 0
+        self._queue_pos = 0
         self.queue = np.zeros(BLOCK, np.float32)
+        self._joined = np.empty(BLOCK + FFT - HOP, np.float32)
+        self._frames = np.lib.stride_tricks.sliding_window_view(
+            self._joined, FFT
+        )[::HOP]
+        self._analysis = np.empty((4, FFT), np.float32)
+        self._feature_buffer = np.empty((10, MEL_BINS), np.float32)
+        self._power = np.empty((4, MASK_BINS), np.float32)
+        self._imaginary_power = np.empty_like(self._power)
+        self._mel = np.empty((4, MEL_BINS), np.float32)
+        self._gain = np.empty_like(self._power)
+        self._masked = np.empty((4, MASK_BINS), np.complex64)
+        self._ola = np.empty(BLOCK + FFT - HOP, np.float32)
         self.long_peak = PeakTracker(60_000)
         self.short_peak = PeakTracker(8_000)
         self.peak_history = np.ones(3, np.float32)
@@ -244,54 +231,60 @@ class Denoiser:
 
     # ----------------------------------------------------------------- features
     def _features(self, spectrum: np.ndarray) -> np.ndarray:
-        power = (spectrum.real ** 2 + spectrum.imag ** 2).astype(np.float32)
+        power = self._power
+        np.square(spectrum.real, out=power)
+        np.square(spectrum.imag, out=self._imaginary_power)
+        np.add(power, self._imaginary_power, out=power)
         # The original packed real FFT folds Nyquist into the DC imaginary part.
         power[:, 0] += power[:, -1]
         power[:, -1] = 0.0
-        mel = np.stack(
-            [
-                np.bincount(
-                    self.mel_band,
-                    weights=p[self.mel_bin] * self.mel_value,
-                    minlength=MEL_BINS,
-                )
-                for p in power
-            ]
-        ).astype(np.float32)
-        return np.clip(
-            np.log10(np.maximum(mel, np.float32(2 ** -24))) * np.float32(1 / 8.8)
-            + np.float32(4 / 8.8),
-            0.0,
-            1.0,
-        )
+        mel = self._mel
+        for i, row in enumerate(power):
+            mel[i] = np.bincount(
+                self.mel_band,
+                weights=row[self.mel_bin] * self.mel_value,
+                minlength=MEL_BINS,
+            )
+        np.maximum(mel, np.float32(2 ** -24), out=mel)
+        np.log10(mel, out=mel)
+        np.multiply(mel, np.float32(1 / 8.8), out=mel)
+        np.add(mel, np.float32(4 / 8.8), out=mel)
+        np.clip(mel, 0.0, 1.0, out=mel)
+        return mel
 
     def _infer_block(self, audio: np.ndarray) -> np.ndarray:
         audio, peaks, flags = self._normalize(audio)
-        joined = np.concatenate((self.audio_history, audio))
-        frames = np.stack([joined[i * HOP:i * HOP + FFT] for i in range(4)])
-        spectrum = np.fft.rfft(frames * self.window, axis=1).astype(np.complex64)
-        features = np.concatenate((self.feature_history, self._features(spectrum)))
+        joined = self._joined
+        joined[:FFT - HOP] = self.audio_history
+        joined[FFT - HOP:] = audio
+        np.multiply(self._frames, self.window, out=self._analysis)
+        spectrum = np.fft.rfft(self._analysis, axis=1).astype(np.complex64, copy=False)
+        features = self._feature_buffer
+        features[:6] = self.feature_history
+        features[6:] = self._features(spectrum)
         outputs = dict(
             zip(
                 self.output_names,
                 self.session.run(None, {"main_input": features[None, None], **self.states}),
             )
         )
-        self.states = {
-            f"input_{i}": outputs[f"output_{i}"][:, -1, :].copy()
-            for i in range(1, 5)
-        }
-        self.feature_history = features[-6:].copy()
-        self.audio_history = joined[-(FFT - HOP):].copy()
-        gain = 1.0 - self.intensity * outputs["main_output"][0]
+        for i in range(1, 5):
+            self.states[f"input_{i}"][:] = outputs[f"output_{i}"][:, -1, :]
+        self.feature_history[:] = features[-6:]
+        self.audio_history[:] = joined[-(FFT - HOP):]
+        gain = self._gain
+        np.multiply(self.intensity, outputs["main_output"][0], out=gain)
+        np.subtract(np.float32(1.0), gain, out=gain)
         gain[:, -1] = gain[:, 0]
-        frames = np.fft.irfft(spectrum * gain, n=FFT, axis=1).astype(np.float32)
+        np.multiply(spectrum, gain, out=self._masked)
+        frames = np.fft.irfft(self._masked, n=FFT, axis=1).astype(np.float32, copy=False)
         frames *= self.synthesis_window
-        ola = np.zeros(BLOCK + FFT - HOP, np.float32)
+        ola = self._ola
+        ola.fill(0.0)
         ola[:FFT - HOP] = self.overlap
         for i, frame in enumerate(frames):
             ola[i * HOP:i * HOP + FFT] += frame
-        self.overlap = ola[BLOCK:].copy()
+        self.overlap[:] = ola[BLOCK:]
         return self._restore_gain(ola[:BLOCK], peaks, flags)
 
     # ------------------------------------------------------------------- public
@@ -299,13 +292,15 @@ class Denoiser:
         samples = np.asarray(samples, dtype=np.float32)
         if samples.shape != (HOP,) or not np.isfinite(samples).all():
             raise ValueError(tr("Expected 480 finite mono samples"))
-        self.pending.append(samples.copy())
-        if len(self.pending) == 4:
-            block = np.concatenate(self.pending)
-            self.pending.clear()
-            self.queue = np.concatenate((self.queue, self._infer_block(block)))
-        result = self.queue[:HOP].copy()
-        self.queue = self.queue[HOP:]
+        self._input_block[self._input_count:self._input_count + HOP] = samples
+        self._input_count += HOP
+        # Read the previous block before inference reuses its overlap-add buffer.
+        result = self.queue[self._queue_pos:self._queue_pos + HOP].copy()
+        self._queue_pos += HOP
+        if self._input_count == BLOCK:
+            self.queue = self._infer_block(self._input_block)
+            self._input_count = 0
+            self._queue_pos = 0
         return result
 
     def process_audio(self, samples: Iterable[float]) -> np.ndarray:
@@ -384,3 +379,34 @@ def write_wav(path: str | Path, audio: np.ndarray) -> None:
         f.setsampwidth(2)
         f.setframerate(RATE)
         f.writeframes(np.clip(np.rint(audio * 32768), -32768, 32767).astype("<i2").tobytes())
+
+def create_session(model_path, provider, device_id, threads, providers=None):
+    """Shared ONNX provider setup for portable audio engines."""
+    available = ort.get_available_providers()
+    if providers is None:
+        requested = [_PROVIDER_ALIASES.get(provider.lower(), provider)]
+    else:
+        requested = [str(p) for p in providers]
+    chosen = [p for p in requested if p in available]
+    unknown = [p for p in requested if p not in available]
+    if not chosen:
+        raise RuntimeError(
+            f"Requested provider(s) {unknown or requested} are unavailable. "
+            f"Installed providers: {available}"
+        )
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = int(threads)
+    options.enable_mem_pattern = "DmlExecutionProvider" not in chosen
+    options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    provider_list = []
+    for name in chosen:
+        name, opts = Denoiser._provider_options(name, device_id)
+        provider_list.append((name, opts))
+    if "CPUExecutionProvider" not in chosen:
+        provider_list.append("CPUExecutionProvider")
+    session = ort.InferenceSession(
+        str(model_path), sess_options=options, providers=provider_list
+    )
+    if not any(p in session.get_providers() for p in chosen):
+        raise RuntimeError(tr('所选推理后端初始化失败，请检查 GPU 运行库及驱动，或在设置中切换到 CPU。'))
+    return session

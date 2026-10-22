@@ -1,9 +1,10 @@
 # 跨平台兼容性与 pip 发行检查
 
-检查日期：2026-10-21。本文区分代码实现、自动化验证和真实音频设备验收。
+检查日期：2026-10-22。本文区分代码实现、自动化验证和真实音频设备验收。
 0.2.1 补齐 macOS / Linux 桌面集成，可以从此前的 0.2.0 pip 安装升级。
 0.2.2 增加首次启动的高性能 GPU 默认选择、CLI `auto` 和 macOS CoreML 入口。
 0.2.3 将程序迁入 `src/openbroadcast/`，同步调整可编辑安装、文档资源和 Windows 构建路径。
+0.2.4 增加麦克风音棚音效、跨显卡显存管理和持续实时性能不足提醒。
 开发环境为 Windows x64 / CPython 3.12，另在 Ubuntu 24.04 WSL / Xvfb 中验证 Linux 桌面功能；
 macOS 仍待原生验收，WSL 测试不代表 Linux 音频硬件已通过验收。
 
@@ -25,8 +26,9 @@ Python 源码本身没有平台绑定；NumPy、ONNX Runtime、sounddevice、sou
 - macOS / Linux 自动安装 `PySide6-Essentials`，托盘在独立进程的主线程中运行 Qt；
   Tk 界面和音频处理仍在原进程。这样避免在 Tk 中混用第二套 GUI 事件循环，
   也避免要求 Linux 虚拟环境从源码编译 PyGObject。Qt 自带库会增加安装体积。
-- wheel 内含两份 ONNX 模型、DSP NPZ、双语 README 和 Windows 源码启动脚本；
+- 当前源码构建的 wheel 内含三份 ONNX 模型、DSP NPZ、双语 README 和 Windows 源码启动脚本；
   模型仍按安装包目录定位，不依赖当前工作目录。没有首次运行联网下载模型的逻辑。
+  wheel 同时携带可选的 Windows x64 DirectML 辅助模块；其他平台不会加载该 DLL。
 - GUI 依赖 Tk 和桌面会话；Linux 另需系统 PortAudio，必要时安装 libsndfile。
   Python/pip 包不负责安装系统库或虚拟音频驱动。
 
@@ -41,12 +43,15 @@ Tk 必须与虚拟环境所用的 Python 对应，可运行 `python -m tkinter` 
 在项目目录构建：
 
 ```sh
+git lfs install
+git lfs pull
 python -m pip install build twine
 python -m build --outdir dist/pypi
 python -m twine check --strict dist/pypi/*
 ```
 
 默认构建先生成 sdist，再从 sdist 构建 wheel，因此可以发现源码发行包遗漏文件的问题。
+从 Git 克隆后需安装 Git LFS 并拉取音棚模型；发行 wheel 和便携 ZIP 已包含完整模型，无需 Git LFS。
 安装使用 `python -m pip install .` 或 `python -m pip install path/to/package.whl`；
 开发使用 `python -m pip install -e .`。安装后有 `openbroadcast`、`openbroadcast-gui`
 和 `python -m openbroadcast` 三个入口。Windows 自启仍使用环境中的绝对 `pythonw.exe`
@@ -87,7 +92,8 @@ macOS 的 pip 入口是 `openbroadcast-gui` 或 `python -m openbroadcast`。
 | 页面滚动 | MouseWheel / 120 | 原生小步长 | X11 Button-4 / Button-5 | 下拉框滚轮保护保留 |
 | 设置保存、主题、中英文 | 已实现 | 已实现 | 已实现 | Windows 读取 UI 语言，其他系统读取 locale 环境 |
 | 读取已装 NVIDIA Broadcast 的试听素材 | 可选 | 无 | 无 | 不打包素材，缺失时不影响录音 / 文件处理 |
-| 视频、音棚音效、内置虚拟声卡 | 无 | 无 | 无 | 现阶段不支持 |
+| 音棚音效（当前源码） | CPU / DirectML 已验证 | 未验证 | 未验证 | 默认关闭，替代降噪与去混响；不提供强度调节，CPU 实测未达到实时速度 |
+| 视频、内置虚拟声卡 | 无 | 无 | 无 | 现阶段不支持 |
 
 设置路径：Windows `%APPDATA%/OpenBroadcast/settings.json`；
 macOS `~/Library/Application Support/OpenBroadcast/settings.json`；
@@ -136,6 +142,111 @@ Linux `$XDG_CONFIG_HOME/OpenBroadcast/settings.json`，未设置时为 `~/.confi
   不丢失首次启动尚未创建 GUI 时收到的唤醒请求。
   不删除持锁文件，避免新进程通过另一个 inode 绕过原有锁。
 
+## 音棚音效验证
+
+音棚音效的当前源码验证（Windows，ONNX Runtime DirectML 1.24.4）：
+
+- 音棚音效仅在麦克风侧提供，文件处理沿用麦克风所选效果；扬声器与其试听仅提供降噪和房间回声消除。
+- 独立模型约 501 MB，使用标准 ONNX 算子，不加载 NVIDIA SDK 或 TensorRT。
+- 与本机原版对照两段各 12 秒语音，连续独立状态输出 SNR 约 22–27 dB；
+  生成式网络对累加精度差异敏感，不保证与原版逐位一致。
+- 本轮相对上一版（已启用图融合和缓冲复用）：RTX 5090 两段各 12 秒语音、
+  CPU 与 AMD 两段各 2 秒语音，各重复三轮，完整输出及重复重置均逐位一致。
+  146 组浮点缓存的所有输入消费者原本就先转换到 FP16；把这一舍入移到缓存输出边界，
+  以 FP16 保存缓存，权重与内部运算不变。包括计数器在内的 147 组有效状态已核对一致。
+  双份缓存的张量数据由约 181.5 MB 减至 90.7 MB；这不是整个模型的显存用量，
+  还存在权重、执行工作区及资源对齐开销。
+- DirectML 保留主机侧最终 Tanh、半精度舍入和限幅，维持模型主体图融合。
+  Windows x64 辅助模块在所选适配器上创建同一 D3D12 设备、DirectML 设备与命令队列，
+  显式复用双份 GPU 状态、I/O 绑定和上传/回读缓冲；仅音频每块往返，循环状态留在显存。
+  本机 NVIDIA 和 AMD 均已验证实际使用此路径，修复了 Python 独立 DML 分配器只能用
+  adapter 0 的限制。Intel 尚未实机验证；CPU 和其他平台保留标准 ONNX Runtime 路径。
+  辅助模块缺失、不受支持或首次预热失败时，会关闭资源并回退同一所选 GPU 的 Python ORT 路径；
+  实时处理开始后的错误会正常上报。Python 回退路径仅在 adapter 0 使用独立绑定缓冲。
+  48 kHz、480 样本接口的缓冲为 3360 样本（70 ms）；文件处理补齐尾部并去除该缓冲。
+- 降噪和去混响复用输入、FFT 前后处理及重叠相加缓冲，不改变模型或运算精度；
+  CPU、RTX 5090 与 AMD 核显的新旧输出均已验证逐位一致。
+- RTX 5090 双声道独立缓存测试（4 秒）每个 80 ms 块中位约 19.0 ms，P95 约 21.8 ms。
+  CPU 与本机 AMD 核显的音棚音效仍未达到实时速度；以上不是其他设备或多路并发性能保证。
+- 重置、流式与整文件一致性、边界长度、双声道独立缓存，以及中英文两种布局已验证。
+  真实设备长时间路由与其他平台仍需实机验收。
+
+2026-10-22 本轮在 RTX 5090 上的性能对照（48 kHz 单声道，8 个推理线程）：下表单位为每 80 ms 音频的
+平均处理毫秒数，由完整 12 秒流水线总耗时的中位数折算；越低越好，实时预算为 80 ms。
+两段语音均使用独立连续状态，统一补齐 160 ms 尾部，计时包含音频前后处理和 GPU 同步，
+不含模型加载。原生列调用本机 Broadcast 随附 SDK 和对应模型，不包含设备或虚拟声卡链路。
+
+| 麦克风效果 | 本轮修改前 | 新版 | 本机原生 SDK |
+| --- | ---: | ---: | ---: |
+| 噪音消除 | 1.290 ms | 1.337 ms | 0.687 ms |
+| 房间回声消除 | 1.321 ms | 1.325 ms | 0.693 ms |
+| 回声消除 → 降噪 | 2.660 ms | 2.803 ms | 1.404 ms |
+| 音棚音效 | 10.436 ms | 10.162 ms | 5.146 ms |
+
+“本轮修改前”是上一轮已优化的实现。音棚新旧版使用同进程独立实例，交替 AB/BA，
+每段语音各 3 轮；6 对中 4 对新版更快、2 对略慢，中位总耗时减少 2.63%，属于小幅收益。
+音棚处理 12 秒的总耗时从 1.565 秒变为 1.524 秒，原生约 0.772 秒，
+新版耗时仍约为原生的 1.97 倍。80 ms 窗口 P95 的跨轮中位数从 11.314 降至 10.828 ms。
+前三种效果本轮未合入不稳定优化，表中前后差异来自不同测量批次的波动，不代表算法提速或回退。
+原生每段也测 3 轮，每轮重建实例，避免测试中反复调用 SDK Reset 出现的状态异常；
+重建与 reset 不计入处理时间，开启 CUDA Graph、读取输出前同步 GPU，并逐轮核对输出。
+70 ms 缓冲延迟没有改变，以上耗时也不等于端到端通话延迟。
+
+跨后端音棚补充验证（每段 2 秒语音、各 3 轮，同样补齐 160 ms 尾部）：
+
+| 设备 | 修改前处理 2 秒音频 | 新版处理 2 秒音频 | 新版实时因子 |
+| --- | ---: | ---: | ---: |
+| Ryzen 7 9800X3D，8 线程 | 3.109 s | 2.938 s | 1.469 |
+| AMD Radeon 核显 | 8.553 s | 7.729 s | 3.864 |
+
+CPU 使用 AB/BA；AMD 使用独立进程、单会话常驻，两批相邻复测，耗时约减少 9.6%。
+双模型同时驻留的压力测试会使 AMD 新版变慢至约 9.7 s / 2 s，因此不能拿共驻数据代表单路性能。
+短样本的尾部补齐占比较高，不宜与 12 秒样本直接比较。CPU 和这块 AMD 核显仍不满足音棚实时速度。
+其他三种效果在 CPU 和 AMD 上也完成复测，全部 24 项新旧完整波形比较逐位一致。
+本轮通过 200 项现有回归测试中的 188 项，12 项按平台条件跳过；14 项性能提醒测试和
+3 项启动回退测试全部通过。重置、流式/文件一致性、边界长度、双声道状态隔离及资源关闭通过验证；
+项目外构建的 Windows 程序已实际验证 CPU、RTX 和 AMD 三模型推理及界面/托盘，
+两块 GPU 均启用新模块且无初始化回退。
+
+### 耗时拆分与辅助模块
+
+可选 `NativeDmlSession(..., profile=True)` 通过 `last_timing` 返回每次调用的 CPU 分段及
+D3D12 GPU 时间戳；默认关闭时间戳查询。下面为同一生产模型和 DLL、单会话、8 个推理线程、
+20 块实音预热后连续 60 块的中位数，每块 80 ms 音频，单位 ms：
+
+| 分段 | RTX 5090 | AMD Radeon 核显 |
+| --- | ---: | ---: |
+| CPU 准备并提交上传 | 0.0581 | 0.0809 |
+| CPU 提交推理及回读 | 0.2924 | 0.6154 |
+| CPU 等待完成 | 9.2227 | 284.9923 |
+| CPU 回读复制 | 0.0007 | 0.0010 |
+| 辅助模块调用总计 | 9.6545 | 285.6502 |
+| GPU 上传 | 0.0011 | 0.0018 |
+| GPU 推理队列区间 | 9.5243 | 285.3982 |
+| GPU 下载 | 0.0020 | 0.0015 |
+
+辅助模块调用总计 P95 分别为 10.5760 / 287.7103 ms，不包括 Python 音频队列与最终激活。
+GPU 推理区间可能包含等待 CPU 提交的空隙，不代表活跃算子时长之和；CPU 与 GPU 区间重叠，
+不能相加，各分段的中位数也不能相加得到总计。音频传输开销已经很小，剩余差距主要在模型执行。
+
+其他效果也进行了前后处理与推理拆分：RTX 的降噪/去混响推理约占 68%，AMD 约占 97%。
+高线程数串联场景关闭线程自旋或共用线程池可以提速，但会拖慢默认线程数及单效果，
+因此未作为全局策略合入；预录制拷贝命令也未得到稳定收益。本轮保留模型权重、内部运算精度和效果强度。
+
+辅助模块源代码与交付 DLL 位于 `src/openbroadcast/audio/native/`，仅使用标准 D3D12/DirectML
+和安装包内同版本 ORT C API，不增加 CUDA、TensorRT 或厂商专有依赖。
+Windows x64 构建需要 Visual Studio C++ 工具及含 DirectML.h 的 Windows SDK；可在项目根目录运行：
+
+```powershell
+.\packaging\windows\build_explicit_dml.ps1 `
+  -Source .\src\openbroadcast\audio\native\explicit_dml.cpp `
+  -Output .\src\openbroadcast\audio\native\explicit_dml.dll
+```
+
+脚本按 SHA-256 校验 ORT 1.24.4 头文件，默认将下载和编译中间文件放到系统临时目录，
+项目内只更新指定 DLL。PyInstaller 同时收集该模块和 ORT 的 `onnxruntime.dll`、`DirectML.dll`；
+`--check-runtime` 报告音棚实际是否启用此路径、所选适配器及初始化回退原因。
+
 ## 音频接线
 
 Windows 和 macOS 使用用户自行安装的 [VB-CABLE](https://vb-audio.com/Cable/)。
@@ -161,7 +272,7 @@ GUI 测试在 Aqua 上跳过。真实菜单交互需要 macOS 手工验收。
 
 - 导入路径确实位于 site-packages，而非被源码目录掩盖；
 - 控制台 / GUI 入口、版本、模型哈希及打包资源；
-- 两个模型分别执行真实 CPU 推理；
+- 三个模型分别执行真实 CPU 推理；
 - 双声道 FLAC 经过两级模型后写出 WAV，帧数、采样率和数值有效；
 - Tk、PortAudio 和 libsndfile 可以加载。
 
